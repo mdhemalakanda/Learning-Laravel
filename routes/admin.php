@@ -1,6 +1,7 @@
 <?php
 use Illuminate\Support\Facades\Route;
 use APP\HTTP\Controllers\AdminController;
+use App\Http\Controllers\TeacherController;
 
 // Route::prefix('hemal')->name('hemal')->middleware('auth')->group(function() {
 //     Route::get('/', function() {
@@ -12,4 +13,9 @@ Route::prefix('student')->name('std.')->group(function() {
     Route::get('teacher/{name}', function(string $name) {
         return 'Teacher name: '. $name;
     })->name('teacher')->middleware('student_middleware');
+});
+
+Route::prefix('teacher')->name('teacher.')->group(function() {
+    Route::get('register', [TeacherController::class, 'show_register_form']);
+    Route::post('/handle-teacher', [TeacherController::class, 'handle_teacher'])->name('create-teacher-acc');
 });
