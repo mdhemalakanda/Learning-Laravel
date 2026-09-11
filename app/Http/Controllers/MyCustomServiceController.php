@@ -14,4 +14,8 @@ class MyCustomServiceController extends Controller
     public function show_service() {
         echo \App\Service\FacadesService::welcome('Hemal');
     }
+    
+    public function login() {
+        return true;
+    }
 }

@@ -1,11 +1,40 @@
 <?php
-use App\Http\Controllers\UserInfo;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MyCustomServiceController;
 
-Route::get('/', function () {
-    return view('welcome');
+use App\Http\Controllers\IndexController;
+use Illuminate\Support\Facades\Route;
+
+// Basic Admin Route
+Route::get('/admin', function () {
+    return "its work for admin";
 });
-Route::get('/user-info', [UserInfo::class, 'user_info']);
-Route::get('/notice', [UserInfo::class, 'get_notice']);
-Route::get('/mycustomservice', [MyCustomServiceController::class, 'show_service']);
+
+// Dynamic Route with Parameter
+Route::get('/view-student/{id}', function (string $id) {
+    return 'User ID: ' . $id;
+});
+
+// Admin Group Routes (Prefix & Name)
+Route::name('admin.')->prefix('learnhunter')->group(function () {
+    
+    Route::get('/dashboard', function () {
+        return "Welcome to the admin dashboard";
+    })->name('dashboard');
+
+    Route::get('/settings', function () {
+        return "Admin settings page";
+    })->name('setting');
+
+});
+
+// Student Resource / CRUD Routes (IndexController)
+Route::prefix('students')->name('students.')->group(function () {
+    Route::get('/', [IndexController::class, 'index'])->name('index');
+    Route::get('/create', [IndexController::class, 'create'])->name('create');
+    Route::post('/store', [IndexController::class, 'store'])->name('store');
+    Route::get('/{id}', [IndexController::class, 'show'])->name('show');
+    Route::get('/{id}/edit', [IndexController::class, 'edit'])->name('edit');
+    Route::put('/{id}', [IndexController::class, 'update'])->name('update');
+    Route::delete('/{id}', [IndexController::class, 'destroy'])->name('destroy');
+});
+
+Route::resource('student', \App\Http\Controllers\IndexController::class); // for crud operation
