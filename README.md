@@ -11,6 +11,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`05-Middleware`](https://github.com/mdhemalakanda/Learning-Laravel/tree/05-Middleware) | Middleware | Custom middleware, middleware aliases, request filtering |
 | [`06-CSRF-Token-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/06-CSRF-Token-Validation) | CSRF Protection | `@csrf` directive, session tokens, POST form handling |
 | [`07-Controller`](https://github.com/mdhemalakanda/Learning-Laravel/tree/07-Controller) | Controllers | Invokable (single-action) controllers, resource controllers |
+| [`08-Request`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-Request) | HTTP Requests | Request injection, `all()`, `input()`, `url()`, `path()` |
 
 ---
 
@@ -23,6 +24,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 05 — Middleware](#branch-05--middleware)
 - [Branch 06 — CSRF Token Validation](#branch-06--csrf-token-validation)
 - [Branch 07 — Controllers](#branch-07--controllers)
+- [Branch 08 — HTTP Requests](#branch-08--http-requests)
 
 ---
 
@@ -777,6 +779,72 @@ Route::resource('resource', ResourceController::class);
 | `/invoke` | `something from invoke` |
 | `/resource` | `this is resource` |
 | `php artisan route:list` | See all 7 auto-generated `resource.*` routes |
+
+---
+
+## Branch 08 — HTTP Requests
+
+> **Topic:** The `Illuminate\Http\Request` object — how Laravel represents an incoming request and the accessors for reading its data.
+> **Modified:** `app/Http/Controllers/TeacherController.php`
+> **Official docs:** [HTTP Requests](https://laravel.com/docs/requests)
+
+### The Concept
+
+Every HTTP request that enters your Laravel app is wrapped into an `Illuminate\Http\Request` object that holds **everything** about the request: input data (form fields, JSON, query strings), headers, cookies, files, the URL, and the session.
+
+You never construct this object yourself — thanks to the **service container** (Branch 01/02), you simply **type-hint `Request` in your controller method** and Laravel injects the real incoming request automatically:
+
+```php
+public function handle_teacher(Request $request, TeacherService $teacher)
+```
+
+Once injected, accessor methods let you read exactly what you need:
+
+| Method | Returns |
+| ------ | ------- |
+| `$request->all()` | **All** input data as an array (form fields + query string) |
+| `$request->input('username')` | A **single** input value by name (searches form body and query string) |
+| `$request->path()` | The request URI **without** domain or query string — e.g. `teacher/handle-teacher` |
+| `$request->url()` | The full URL **without** the query string — e.g. `http://herd_example.test/teacher/handle-teacher` |
+| `$request->fullUrl()` | The full URL **including** the query string |
+| `$request->session()->token()` | The session's CSRF token (see Branch 06) |
+
+### The Code
+
+The Branch 06 `handle_teacher()` action becomes a playground for these accessors — uncomment any `dd(...)` line to dump that piece of request data instead:
+
+```php
+// app/Http/Controllers/TeacherController.php
+public function handle_teacher(Request $request, TeacherService $teacher)
+{
+    // $token = $request->session()->token();
+    // $is_registered = $teacher->handle_acc();
+    // dd($request->all());
+    // dd($request->input('username'));
+    // dd($request->url());
+    // dd($request->fullUrl());
+    dd($request->path());
+}
+```
+
+### How It Works
+
+```mermaid
+flowchart LR
+    A["Browser submits form<br/>POST /teacher/handle-teacher"] --> B["Laravel wraps everything about the request<br/>(input, headers, URL, session) into Request"]
+    B --> C["Container sees Request type-hint<br/>and injects the live object"]
+    C --> D["Controller reads it:<br/>all(), input(), url(), path()..."]
+    D --> E["dd() dumps the selected data<br/>and stops the app"]
+```
+
+### Try It
+
+1. Visit `/teacher/register`, fill in the form, and submit.
+2. The active line `dd($request->path())` prints `teacher/handle-teacher`.
+3. Swap in the other lines:
+   - `dd($request->all())` → `["username" => "...", "password" => "...", "register_teacher" => "Register", "_token" => "..."]`
+   - `dd($request->input('username'))` → just the username you typed
+   - `dd($request->url())` vs `dd($request->fullUrl())` → add `?x=1` to the form action to see the difference
 
 ---
 
