@@ -1,31 +1,33 @@
 <?php
 
 use App\Http\Controllers\IndexController;
+use App\Http\Controllers\InvokeController;
+use App\Http\Controllers\ResourceController;
 use Illuminate\Support\Facades\Route;
 
 // Basic Admin Route
 Route::get('/admin', function () {
-    return "its work for admin";
+    return 'its work for admin';
 });
 
-Route::get('/', function() {
+Route::get('/', function () {
     return view('welcome');
 });
 
 // Dynamic Route with Parameter
 Route::get('/view-student/{id}', function (string $id) {
-    return 'User ID: ' . $id;
+    return 'User ID: '.$id;
 });
 
 // Admin Group Routes (Prefix & Name)
 Route::name('admin.')->prefix('learnhunter')->group(function () {
-    
+
     Route::get('/dashboard', function () {
-        return "Welcome to the admin dashboard";
+        return 'Welcome to the admin dashboard';
     })->name('dashboard');
 
     Route::get('/settings', function () {
-        return "Admin settings page";
+        return 'Admin settings page';
     })->name('setting');
 
 });
@@ -41,4 +43,7 @@ Route::prefix('students')->name('students.')->group(function () {
     Route::delete('/{id}', [IndexController::class, 'destroy'])->name('destroy');
 });
 
-Route::resource('student', \App\Http\Controllers\IndexController::class); // for crud operation
+Route::resource('student', IndexController::class); // for crud operation
+
+Route::get('/invoke', InvokeController::class);
+Route::resource('resource', ResourceController::class);
