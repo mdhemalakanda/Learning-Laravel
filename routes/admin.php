@@ -11,5 +11,5 @@ use APP\HTTP\Controllers\AdminController;
 Route::prefix('student')->name('std.')->group(function() {
     Route::get('teacher/{name}', function(string $name) {
         return 'Teacher name: '. $name;
-    })->name('teacher');
+    })->name('teacher')->middleware('student_middleware');
 });

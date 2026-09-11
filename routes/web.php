@@ -8,6 +8,10 @@ Route::get('/admin', function () {
     return "its work for admin";
 });
 
+Route::get('/', function() {
+    return view('welcome');
+});
+
 // Dynamic Route with Parameter
 Route::get('/view-student/{id}', function (string $id) {
     return 'User ID: ' . $id;

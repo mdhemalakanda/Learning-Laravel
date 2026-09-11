@@ -1,1 +1,1 @@
-<h1><a href="{{ route('std.teacher', ['name' => 'MD Hemal Akhand']) }}">Teacher</a></h1>
+<h1><a href="{{ route('std.teacher', ['name' => 'MD Hemal Akhand', 'age' => 30]) }}">Teacher</a></h1>
