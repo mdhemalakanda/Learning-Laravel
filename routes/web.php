@@ -3,6 +3,7 @@
 use App\Http\Controllers\IndexController;
 use App\Http\Controllers\InvokeController;
 use App\Http\Controllers\ResourceController;
+use App\Http\Controllers\userInfo;
 use App\Http\Controllers\ViewController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,3 +52,6 @@ Route::resource('resource', ResourceController::class);
 
 // view class.
 Route::get('/view-blade', [ViewController::class, 'show_info'])->name('view-blade');
+
+// Validation lesson — POST form handled with $request->validate()
+Route::post('/user-registration', [userInfo::class, 'handleUserReq'])->name('handle-user');

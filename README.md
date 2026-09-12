@@ -15,6 +15,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`08-HTTP-Requests`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-HTTP-Requests) | HTTP Responses (Part 2) | `response()` with headers/cookies, `redirect()`, `view()`, `response()->json()` |
 | [`09-View`](https://github.com/mdhemalakanda/Learning-Laravel/tree/09-View) | Views | `view()` data passing (`compact()`, `with()`), `View::first()` fallback, `View::share()` via service provider |
 | [`10-URL-Generation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/10-URL-Generation) | URL Generation | `url()` helper, `url()->current()` / `full()` / `previous()`, `url()` vs `route()` |
+| [`11-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/11-Validation) | Validation | `$request->validate()`, validation rules, `$errors` bag, `@error` directive |
 
 ---
 
@@ -31,6 +32,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 08 (Part 2) — HTTP Responses](#branch-08-part-2--http-responses)
 - [Branch 09 — Views](#branch-09--views)
 - [Branch 10 — URL Generation](#branch-10--url-generation)
+- [Branch 11 — Validation](#branch-11--validation)
 
 ---
 
@@ -1232,6 +1234,112 @@ flowchart TD
 
 ---
 
+## Branch 11 — Validation
+
+> **Topic:** Validating incoming request data with `$request->validate()` and showing the error messages in Blade with `@error`.
+> **Modified:** `app/Http/Controllers/userInfo.php`, `routes/web.php`, `resources/views/welcome.blade.php`
+> **Official docs:** [Validation](https://laravel.com/docs/validation) · [Blade `@error`](https://laravel.com/docs/blade#validation-errors)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Controllers/userInfo.php` | `handleUserReq()` — runs the validation rules before touching the data |
+| `routes/web.php` | POST `/user-registration` route (named `handle-user`) pointing at the controller |
+| `resources/views/welcome.blade.php` | The form — `@csrf`, an `@error` block under each field, and an `$errors` summary on top |
+
+### The Concept
+
+**Validation** checks incoming input against **rules** before your app works with it. The quickest way is `$request->validate([...])` inside the controller:
+
+- If **every rule passes**, `validate()` returns the validated data (only the fields you listed) and your code continues normally.
+- If **any rule fails**, Laravel throws a `ValidationException`. For standard web requests the framework catches it and **redirects the visitor back** to the form, flashing all messages into the shared `$errors` bag. No `if/else` needed — the redirect happens automatically.
+
+The rules used in this lesson:
+
+| Rule | Fails when... | Example message |
+| ---- | ------------- | --------------- |
+| `required` | The field is missing or an empty string | `The username field is required.` |
+| `string` | The value is not a string | `The username must be a string.` |
+| `min:6` / `max:50` | The value is shorter / longer than the limit | `The password field must be at least 6 characters.` |
+
+In Blade, the `@error('field')` directive scopes the messages of a single field — inside it, `$message` holds the first error for that field. `@if ($errors->any())` renders the full list above the form.
+
+### The Code
+
+**1. Validate in the controller** — list the rules per field; if validation fails, the automatic redirect-back happens before `dd()` is ever reached:
+
+```php
+// app/Http/Controllers/userInfo.php
+public function handleUserReq(Request $request)
+{
+    $validated = $request->validate([
+        'username' => ['required', 'string', 'max:255'],
+        'password' => ['required', 'min:6', 'max:50'],
+    ]);
+
+    dd($request->all());
+}
+```
+
+**2. The route** — the form posts to the named route `handle-user`:
+
+```php
+// routes/web.php
+Route::post('/user-registration', [userInfo::class, 'handleUserReq'])->name('handle-user');
+```
+
+**3. The Blade form** — `@csrf` from Branch 06, an `@error` block under each field, and an `$errors` summary on top:
+
+```blade
+{{-- resources/views/welcome.blade.php --}}
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+<form method="POST" action="{{ route('handle-user') }}">
+    @csrf
+    <input name="username" placeholder="Username" type="text" />
+    @error('username')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
+    <input name="password" placeholder="Password" type="password" />
+    @error('password')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
+    <input type="submit" value="Submit">
+</form>
+```
+
+> **ℹ️ Note:** On a failed attempt the page reloads with empty inputs. Add `value="{{ old('username') }}"` to an input to re-fill what the user typed — the old input is flashed alongside the errors.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["Browser submits form<br/>POST /user-registration"] --> B["handleUserReq() calls<br/>$request->validate([...])"]
+    B -- "all rules pass" --> C["Code continues<br/>dd() dumps the input"]
+    B -- "any rule fails" --> D["ValidationException<br/>Laravel redirects back to /"]
+    D --> E["Errors flashed to the session<br/>→ $errors bag in Blade"]
+    E --> F["@if ($errors->any()) prints the summary<br/>@error('field') prints under each input"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/` | The registration form |
+| Submit empty | Redirected back — both `required` messages under the fields and in the top summary |
+| Submit with password `abc` | `The password field must be at least 6 characters.` |
+| Submit valid data | `dd()` dump of the posted input — validation passed |
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -1263,3 +1371,4 @@ php artisan route:list
 - [Laravel Documentation — Redirects](https://laravel.com/docs/redirects)
 - [Laravel Documentation — Views](https://laravel.com/docs/views)
 - [Laravel Documentation — URLs](https://laravel.com/docs/urls)
+- [Laravel Documentation — Validation](https://laravel.com/docs/validation)

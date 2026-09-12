@@ -1,5 +1,21 @@
-<h1><a href="{{ route('std.teacher', ['name' => 'MD Hemal Akhand', 'age' => 30]) }}">Teacher</a></h1>
-<a href="{{ urL('std.teacher', ['name' => 'john']) }}">Teacher</a><br/><br/>
-Current URL: {{ url()->current() }}<br/><br/>
-Current Full URL: {{ url()->full() }}<br/><br/>
-previous URL: {{ url()->previous() }}<br/><br/>
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+<form method="POST" action="{{ route('handle-user') }}">
+    @csrf
+    <input name="username" placeholder="Username" type="text" />
+    @error('username')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
+    <input name="password" placeholder="Password" type="password" />
+    @error('password')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
+    <input type="submit" value="Submit">
+</form>
