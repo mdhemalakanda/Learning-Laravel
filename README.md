@@ -11,7 +11,11 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`05-Middleware`](https://github.com/mdhemalakanda/Learning-Laravel/tree/05-Middleware) | Middleware | Custom middleware, middleware aliases, request filtering |
 | [`06-CSRF-Token-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/06-CSRF-Token-Validation) | CSRF Protection | `@csrf` directive, session tokens, POST form handling |
 | [`07-Controller`](https://github.com/mdhemalakanda/Learning-Laravel/tree/07-Controller) | Controllers | Invokable (single-action) controllers, resource controllers |
-| [`08-Request`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-Request) | HTTP Requests | Request injection, `all()`, `input()`, `url()`, `path()` |
+| [`08-Request`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-Request) | HTTP Requests (Part 1) | Request injection, `all()`, `input()`, `url()`, `path()` |
+| [`08-HTTP-Requests`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-HTTP-Requests) | HTTP Responses (Part 2) | `response()` with headers/cookies, `redirect()`, `view()`, `response()->json()` |
+| [`09-View`](https://github.com/mdhemalakanda/Learning-Laravel/tree/09-View) | Views | `view()` data passing (`compact()`, `with()`), `View::first()` fallback, `View::share()` via service provider |
+| [`10-URL-Generation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/10-URL-Generation) | URL Generation | `url()` helper, `url()->current()` / `full()` / `previous()`, `url()` vs `route()` |
+| [`11-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/11-Validation) | Validation | `$request->validate()`, validation rules, `$errors` bag, `@error` directive |
 
 ---
 
@@ -25,6 +29,10 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 06 — CSRF Token Validation](#branch-06--csrf-token-validation)
 - [Branch 07 — Controllers](#branch-07--controllers)
 - [Branch 08 — HTTP Requests](#branch-08--http-requests)
+- [Branch 08 (Part 2) — HTTP Responses](#branch-08-part-2--http-responses)
+- [Branch 09 — Views](#branch-09--views)
+- [Branch 10 — URL Generation](#branch-10--url-generation)
+- [Branch 11 — Validation](#branch-11--validation)
 
 ---
 
@@ -924,6 +932,414 @@ flowchart LR
 
 ---
 
+## Branch 08 (Part 2) — HTTP Responses
+
+> **Topic:** The other half of the HTTP cycle — everything a controller can **return**: responses with headers and cookies, redirects, views, and JSON.
+> **Modified:** `app/Http/Controllers/TeacherController.php` (the `handle_teacher()` action)
+> **Official docs:** [HTTP Responses](https://laravel.com/docs/responses) · [Redirects](https://laravel.com/docs/redirects)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Controllers/TeacherController.php` | `handle_teacher()` — the response playground: headers, cookies, redirects, `view()`, `json()` behind one-line-at-a-time returns |
+| `resources/views/teacher-registration.blade.php` | The Branch 06 form you submit to trigger each response type |
+
+### The Concept
+
+Part 1 (branch `08-Request`) was about **reading** the incoming request. This branch covers what comes back: the **response**. Instead of returning a bare string, a controller returns a **response object** — Laravel's `response()` helper and friends build one for every common need:
+
+| Return | What it produces |
+| ------ | ---------------- |
+| `response('Hello World!', 200)->header('Content-Type', 'text/plain')` | Body + status + a **custom header** |
+| `response('Hello World!', 200)->cookie('name', 'value', 60)` | Body + a **cookie** (60 minutes) |
+| `redirect()->back()` | Redirect to the **previous** URL |
+| `redirect()->route('teacher.register')` | Redirect to a **named route** |
+| `redirect('https://...')` | Redirect to an **external** URL |
+| `view('welcome', [...])` | Render a **Blade view** |
+| `response()->json([...])` | **JSON** response with the correct `Content-Type: application/json` header |
+
+A typical POST handler follows the **PRG pattern** — *Post/Redirect/Get*: catch the data, save it, then **redirect** so a browser refresh doesn't re-submit the form.
+
+### The Code
+
+Everything happens inside `handle_teacher()` — the Branch 06 handler turned into a **response playground**. Uncomment one `return` at a time and resubmit the form at `/teacher/register`:
+
+```php
+// app/Http/Controllers/TeacherController.php
+public function handle_teacher(Request $request, TeacherService $teacher)
+{
+    // pass header.
+    // return response('Hello World!', 200)->header('Content-Type', 'text/plain');
+    // pass cookie.
+    // return response('Hello World!', 200)->cookie('test_cookie', 'Test Cookie', 60);
+
+    // working process.
+    // 1. catch the data.
+    // 2. insert into database.
+    // 3. redirect.
+    // return redirect()->back();
+    // return redirect()->route('teacher.register');
+    // return redirect('https://www.google.com');
+    // return view('welcome', ['name', 'hemal']);
+    return response()->json([
+        'message' => 'json message',
+        'data' => $request->all(),
+    ]);
+}
+```
+
+What each `return` produces:
+
+- `response('Hello World!', 200)->header('Content-Type', 'text/plain')` — a body with status `200` and a **custom header**
+- `response('Hello World!', 200)->cookie('test_cookie', 'Test Cookie', 60)` — same body plus a **cookie** that lives 60 minutes
+- `redirect()->back()` — 302 to the **previous** URL
+- `redirect()->route('teacher.register')` — 302 via a **named route** (see the note at the bottom)
+- `redirect('https://www.google.com')` — 302 to an **external** URL
+- `view('welcome', ...)` — renders a **Blade** view
+- `response()->json([...])` — the **active** line: a JSON body with the correct `Content-Type: application/json` header, echoing everything `$request->all()` caught from the form
+
+> **⚠️ Heads-up:** The `view()` experiment above passes a plain list — `['name', 'hemal']` — where the docs use key/value data: `view('welcome', ['name' => 'hemal'])`. A plain list becomes the variable `$0`, `$1` in Blade instead of `$name`. Compare with Branch 04's working examples.
+
+### How It Works
+
+```mermaid
+flowchart LR
+    A["Browser POSTs the form<br/>to /teacher/handle-teacher"] --> B["Controller builds a Response:<br/>json() / redirect() / view() / header() / cookie()"]
+    B --> C["Response travels back<br/>through middleware"]
+    C --> D["Browser receives status + headers + body<br/>— or follows the redirect (302)"]
+    D --> E["GET /teacher/register<br/>(refresh-safe: no re-POST)"]
+```
+
+### Try It
+
+1. Submit the form at `/teacher/register`.
+2. The active `return response()->json(...)` gives:
+   `{"message":"json message","data":{"username":"...","password":"...","register_teacher":"Register","_token":"..."}}`
+3. Swap in the other returns and observe the difference:
+   - `redirect()->back()` → browser lands back on the form (classic PRG flow)
+   - `redirect()->route('teacher.register')` → same, but by route **name** — survives future URL changes
+   - `->cookie('test_cookie', ...)` → DevTools → Application → Cookies → `test_cookie`
+   - `->header('Content-Type', 'text/plain')` → DevTools → Network → Response Headers
+   - `view('welcome', ...)` → the welcome Blade page instead of a redirect
+
+> **ℹ️ Note:** `redirect()->route('teacher.register')` targets the **GET** `register` route (named in `routes/admin.php`), not the POST-only `teacher.create-teacher-acc`. Following a redirect issues a **GET** — and a GET to a POST-only route throws `405 MethodNotAllowedHttpException`.
+
+---
+
+## Branch 09 — Views
+
+> **Topic:** Returning Blade views from controllers — three ways to pass data, the `View::first()` fallback chain, and sharing a variable with **all** views via `View::share()` in a service provider.
+> **New files:** `app/Http/Controllers/ViewController.php`, `app/Providers/viewProvider.php`, `app/Models/Settings.php`, `resources/views/view-blade.blade.php`, `resources/views/student/student-details.blade.php`
+> **Modified:** `routes/web.php`, `bootstrap/providers.php`, `database/seeders/DatabaseSeeder.php` (+ new migration, factory, and `SettingsSeeder`)
+> **Official docs:** [Views](https://laravel.com/docs/views) · [Blade Templates](https://laravel.com/docs/blade)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Controllers/ViewController.php` | `show_info()` — three data-passing styles + `View::first()` fallback |
+| `app/Providers/viewProvider.php` | `boot()` — `View::share('settings', Settings::first())` makes `$settings` global to every view |
+| `app/Models/Settings.php` | Eloquent model for the `settings` table |
+| `database/migrations/2026_09_12_082644_create_settings_table.php` | Creates the `settings` table (with the `phone` column) |
+| `database/factories/SettingsFactory.php` | Generates fake `phone` values |
+| `database/seeders/SettingsSeeder.php` | Inserts the one settings row the provider reads |
+| `resources/views/student/student-details.blade.php` | First view in the `View::first()` array — the one actually rendered |
+| `resources/views/view-blade.blade.php` | The fallback candidate — prints `$pageTitle` + shared `$settings->phone` |
+| `routes/web.php` | The `/view-blade` route (named `view-blade`) |
+| `bootstrap/providers.php` | Registers `viewProvider` |
+
+### The Concept
+
+Controllers rarely return raw strings — they **render views**. Laravel resolves a view by its dot-notation name: `student.student-details` maps to `resources/views/student/student-details.blade.php`.
+
+**Passing data to a view** — three equivalent styles, each making the key available as a variable in Blade (`{{ $pageTitle }}`):
+
+| Style | Example |
+| ----- | ------- |
+| Key/value array (most used) | `view('view-blade', ['pageTitle' => $pageTitle])` |
+| `compact()` | `view('view-blade', compact('pageTitle'))` |
+| Chained `with()` | `view('view-blade')->with('pageTitle', $pageTitle)` |
+
+**`View::first()`** — renders the **first view in the array that actually exists**. Useful when views can be customized or overridden: `View::first(['student.student-details', 'welcome'], $data)` falls back to `welcome` if the student view is missing.
+
+**`View::share()`** — makes a variable available to **every** view in the app. The docs recommend calling it from a service provider's `boot()` method (see Branch 02) — the classic use case is site-wide data like app settings. This branch shares a `Settings` model backed by a new `settings` table (migration + factory + seeder).
+
+### The Code
+
+**1. The controller** — three ways to pass `$pageTitle`, with the active line using `View::first()`:
+
+```php
+// app/Http/Controllers/ViewController.php
+public function show_info() {
+    $pageTitle = 'View Page';
+    // return view('view-blade', compact('pageTitle')); // most used
+    // return view('view-blade')->with('pageTitle', $pageTitle);
+    return View::first(['student.student-details', 'welcome'], ['pageTitle' => $pageTitle]);
+}
+```
+
+`View::first()` checks the array left to right: `student.student-details` exists, so that is the view rendered. Delete it, and the fallback `welcome` wins instead.
+
+**2. The route:**
+
+```php
+// routes/web.php
+Route::get('/view-blade', [ViewController::class, 'show_info'])->name('view-blade');
+```
+
+**3. Sharing `$settings` with every view** — in the provider's `boot()` (registered in `bootstrap/providers.php`):
+
+```php
+// app/Providers/viewProvider.php
+use App\Models\Settings;
+use Illuminate\Support\Facades\View;
+
+public function boot(): void
+{
+    // Artisan commands (like `migrate`) also boot providers —
+    // skip the DB query there so the settings table can be created first.
+    if (app()->runningInConsole()) {
+        return;
+    }
+
+    $settings = Settings::first();
+    View::share('settings', $settings);
+
+    // show {{ $settings->phone }} in any blade view
+}
+```
+
+After this, `{{ $settings->phone }}` works in **any** Blade file — both views in this branch print it.
+
+**4. The views:**
+
+```blade
+{{-- resources/views/student/student-details.blade.php --}}
+student details
+
+<p>Phone (shared by View::share): {{ $settings->phone }}</p>
+```
+
+```blade
+{{-- resources/views/view-blade.blade.php --}}
+{{ $pageTitle }}
+
+<p>Phone (shared by View::share): {{ $settings->phone }}</p>
+```
+
+**5. The backing data** — a new `Settings` model with a `phone` column, plus a `SettingsSeeder` (called from `DatabaseSeeder`) so the table has a row:
+
+```bash
+php artisan migrate --seed
+```
+
+> **⚠️ Heads-up:** Providers boot on **every** request *and* every artisan command, so a DB query in `boot()` runs always. The `runningInConsole()` guard stops `php artisan migrate` from querying the `settings` table **before it exists** — without it, migration dies with `no such table: settings` (the command crashes while booting, before it can create the table).
+
+> **⚠️ Heads-up:** The `use App\Models\Settings;` import is mandatory. Without it, PHP resolves `Settings` to `App\Providers\Settings`, which doesn't exist — and since providers boot on every request, **every** route in the app fatal-errors, not just `/view-blade`.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["GET /view-blade"] --> B["viewProvider boot():<br/>View::share('settings', Settings::first())"]
+    B --> C["ViewController::show_info()"]
+    C --> D{"View::first([...])<br/>first view that exists?"}
+    D -- "student.student-details exists" --> E["render it with pageTitle<br/>+ the shared settings"]
+    D -- "missing → fallback" --> F["render welcome instead"]
+    E --> G["Blade prints {{ $pageTitle }}<br/>and {{ $settings->phone }}"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/view-blade` | `student details` + `Phone (shared by View::share): +880 1700-000000` |
+| Temporarily rename `resources/views/student/student-details.blade.php`, revisit | The fallback `welcome` view renders instead — `View::first()` picked the next existing view |
+| Swap the commented lines in `show_info()` | `compact()` and `with()` render the exact same page |
+
+---
+
+## Branch 10 — URL Generation
+
+> **Topic:** Generating URLs with the `url()` helper, inspecting the incoming request's URL with the `url()->...` accessors, and the difference between `url()` and `route()`.
+> **Modified:** `resources/views/welcome.blade.php`
+> **Official docs:** [URLs](https://laravel.com/docs/urls)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `resources/views/welcome.blade.php` | Playground view — builds a link with `url()`, prints the current / full / previous URL accessors |
+| `routes/admin.php` | Defines the `std.teacher` route the links point at (from Branch 04) |
+
+### The Concept
+
+Laravel's URL generator builds links in two fundamentally different ways:
+
+| Helper | Builds from | Example output |
+| ------ | ----------- | -------------- |
+| `url('path')` | A raw **path** | `url('admin/settings')` → `http://app.test/admin/settings` |
+| `route('name', [...])` | A **named route** | `route('std.teacher', ['name' => 'john'])` → `http://app.test/student/teacher/john` |
+
+The same `url()` function also doubles as an inspector for the **incoming request's** URL:
+
+| Accessor | Returns |
+| -------- | ------- |
+| `url()->current()` | The current URL **without** the query string |
+| `url()->full()` | The current URL **including** the query string |
+| `url()->previous()` | The URL the visitor came from (the `Referer` header), falling back to `/` |
+
+### The Code
+
+```blade
+{{-- resources/views/welcome.blade.php --}}
+<h1><a href="{{ route('std.teacher', ['name' => 'MD Hemal Akhand', 'age' => 30]) }}">Teacher</a></h1>
+<a href="{{ urL('std.teacher', ['name' => 'john']) }}">Teacher</a><br/><br/>
+Current URL: {{ url()->current() }}<br/><br/>
+Current Full URL: {{ url()->full() }}<br/><br/>
+previous URL: {{ url()->previous() }}<br/><br/>
+```
+
+(PHP helper names are case-insensitive, so `urL()` behaves exactly like `url()`.)
+
+What each line produces:
+
+- `route('std.teacher', ['name' => ..., 'age' => 30])` — the named route with `name` filling the `{name}` placeholder and the extra `age` becoming a query string: `/student/teacher/MD Hemal Akhand?age=30`
+- `url('std.teacher', ['name' => 'john'])` — a **path** URL; array parameters are collapsed into **path segments**: `/std.teacher/john`
+- `url()->current()` vs `url()->full()` — identical here; add `?x=1` to the address bar and `full()` keeps it while `current()` drops it
+- `url()->previous()` — `/` on a direct visit (no referrer), otherwise the page you came from
+
+> **⚠️ Heads-up:** `url()` does **not** resolve route names. `url('std.teacher', ...)` builds the literal path `/std.teacher/john`, which matches no route — clicking the second link gives a **404**. The `route()` link above it works because named routes are its job. Compare the two links side by side on `/`.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["Browser opens /"] --> B["Blade renders welcome view"]
+    B --> C["route('std.teacher', ...)<br/>named route → /student/teacher/MD Hemal Akhand?age=30"]
+    B --> D["url('std.teacher', ...)<br/>raw path + segments → /std.teacher/john (404)"]
+    B --> E["url()->current() / full()<br/>describe THIS request's URL"]
+    B --> F["url()->previous()<br/>Referer header, fallback /"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/` (direct visit) | Top link → `/student/teacher/MD Hemal Akhand?age=30`; second link → `/std.teacher/john`; Current = Full URL = `http://<host>/`; previous = `/` |
+| Add `?x=1` to `/` and reload | `Current Full URL` now shows the `?x=1`, `Current URL` doesn't |
+| Click the **second** Teacher link | `404` — proof that `url()` built a path, not a route URL |
+| Click the **top** Teacher link | `Teacher name: MD Hemal Akhand` with `?age=30` in the query string |
+
+---
+
+## Branch 11 — Validation
+
+> **Topic:** Validating incoming request data with `$request->validate()` and showing the error messages in Blade with `@error`.
+> **Modified:** `app/Http/Controllers/userInfo.php`, `routes/web.php`, `resources/views/welcome.blade.php`
+> **Official docs:** [Validation](https://laravel.com/docs/validation) · [Blade `@error`](https://laravel.com/docs/blade#validation-errors)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Controllers/userInfo.php` | `handleUserReq()` — runs the validation rules before touching the data |
+| `routes/web.php` | POST `/user-registration` route (named `handle-user`) pointing at the controller |
+| `resources/views/welcome.blade.php` | The form — `@csrf`, an `@error` block under each field, and an `$errors` summary on top |
+
+### The Concept
+
+**Validation** checks incoming input against **rules** before your app works with it. The quickest way is `$request->validate([...])` inside the controller:
+
+- If **every rule passes**, `validate()` returns the validated data (only the fields you listed) and your code continues normally.
+- If **any rule fails**, Laravel throws a `ValidationException`. For standard web requests the framework catches it and **redirects the visitor back** to the form, flashing all messages into the shared `$errors` bag. No `if/else` needed — the redirect happens automatically.
+
+The rules used in this lesson:
+
+| Rule | Fails when... | Example message |
+| ---- | ------------- | --------------- |
+| `required` | The field is missing or an empty string | `The username field is required.` |
+| `string` | The value is not a string | `The username must be a string.` |
+| `min:6` / `max:50` | The value is shorter / longer than the limit | `The password field must be at least 6 characters.` |
+
+In Blade, the `@error('field')` directive scopes the messages of a single field — inside it, `$message` holds the first error for that field. `@if ($errors->any())` renders the full list above the form.
+
+### The Code
+
+**1. Validate in the controller** — list the rules per field; if validation fails, the automatic redirect-back happens before `dd()` is ever reached:
+
+```php
+// app/Http/Controllers/userInfo.php
+public function handleUserReq(Request $request)
+{
+    $validated = $request->validate([
+        'username' => ['required', 'string', 'max:255'],
+        'password' => ['required', 'min:6', 'max:50'],
+    ]);
+
+    dd($request->all());
+}
+```
+
+**2. The route** — the form posts to the named route `handle-user`:
+
+```php
+// routes/web.php
+Route::post('/user-registration', [userInfo::class, 'handleUserReq'])->name('handle-user');
+```
+
+**3. The Blade form** — `@csrf` from Branch 06, an `@error` block under each field, and an `$errors` summary on top:
+
+```blade
+{{-- resources/views/welcome.blade.php --}}
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+<form method="POST" action="{{ route('handle-user') }}">
+    @csrf
+    <input name="username" placeholder="Username" type="text" />
+    @error('username')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
+    <input name="password" placeholder="Password" type="password" />
+    @error('password')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
+    <input type="submit" value="Submit">
+</form>
+```
+
+> **ℹ️ Note:** On a failed attempt the page reloads with empty inputs. Add `value="{{ old('username') }}"` to an input to re-fill what the user typed — the old input is flashed alongside the errors.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["Browser submits form<br/>POST /user-registration"] --> B["handleUserReq() calls<br/>$request->validate([...])"]
+    B -- "all rules pass" --> C["Code continues<br/>dd() dumps the input"]
+    B -- "any rule fails" --> D["ValidationException<br/>Laravel redirects back to /"]
+    D --> E["Errors flashed to the session<br/>→ $errors bag in Blade"]
+    E --> F["@if ($errors->any()) prints the summary<br/>@error('field') prints under each input"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/` | The registration form |
+| Submit empty | Redirected back — both `required` messages under the fields and in the top summary |
+| Submit with password `abc` | `The password field must be at least 6 characters.` |
+| Submit valid data | `dd()` dump of the posted input — validation passed |
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -950,3 +1366,9 @@ php artisan route:list
 - [Laravel Documentation — CSRF Protection](https://laravel.com/docs/csrf)
 - [Laravel Documentation — Blade Templates](https://laravel.com/docs/blade)
 - [Laravel Documentation — Controllers](https://laravel.com/docs/controllers)
+- [Laravel Documentation — HTTP Requests](https://laravel.com/docs/requests)
+- [Laravel Documentation — HTTP Responses](https://laravel.com/docs/responses)
+- [Laravel Documentation — Redirects](https://laravel.com/docs/redirects)
+- [Laravel Documentation — Views](https://laravel.com/docs/views)
+- [Laravel Documentation — URLs](https://laravel.com/docs/urls)
+- [Laravel Documentation — Validation](https://laravel.com/docs/validation)
