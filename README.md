@@ -853,7 +853,7 @@ flowchart LR
 ## Branch 08 (Part 2) — HTTP Responses
 
 > **Topic:** The other half of the HTTP cycle — everything a controller can **return**: responses with headers and cookies, redirects, views, and JSON.
-> **Modified:** `app/Http/Controllers/TeacherController.php`, `app/Http/Controllers/ResourceController.php`, `routes/admin.php`
+> **Modified:** `app/Http/Controllers/TeacherController.php` (the `handle_teacher()` action)
 > **Official docs:** [HTTP Responses](https://laravel.com/docs/responses) · [Redirects](https://laravel.com/docs/redirects)
 
 ### The Concept
@@ -874,17 +874,7 @@ A typical POST handler follows the **PRG pattern** — *Post/Redirect/Get*: catc
 
 ### The Code
 
-**1. Name the GET route** — so `redirect()->route(...)` has a name to point at:
-
-```php
-// routes/admin.php
-Route::prefix('teacher')->name('teacher.')->group(function () {
-    Route::get('register', [TeacherController::class, 'show_register_form'])->name('register'); // 👈 named now
-    Route::post('/handle-teacher', [TeacherController::class, 'handle_teacher'])->name('create-teacher-acc');
-});
-```
-
-**2. The POST handler becomes a response playground** — swap the active `return` line:
+Everything happens inside `handle_teacher()` — the Branch 06 handler turned into a **response playground**. Uncomment one `return` at a time and resubmit the form at `/teacher/register`:
 
 ```php
 // app/Http/Controllers/TeacherController.php
@@ -910,14 +900,15 @@ public function handle_teacher(Request $request, TeacherService $teacher)
 }
 ```
 
-**3. Bonus:** `ResourceController::create()` now echoes instead of an empty stub:
+What each `return` produces:
 
-```php
-public function create()
-{
-    echo 'resource create';
-}
-```
+- `response('Hello World!', 200)->header('Content-Type', 'text/plain')` — a body with status `200` and a **custom header**
+- `response('Hello World!', 200)->cookie('test_cookie', 'Test Cookie', 60)` — same body plus a **cookie** that lives 60 minutes
+- `redirect()->back()` — 302 to the **previous** URL
+- `redirect()->route('teacher.register')` — 302 via a **named route** (see the note at the bottom)
+- `redirect('https://www.google.com')` — 302 to an **external** URL
+- `view('welcome', ...)` — renders a **Blade** view
+- `response()->json([...])` — the **active** line: a JSON body with the correct `Content-Type: application/json` header, echoing everything `$request->all()` caught from the form
 
 > **⚠️ Heads-up:** The `view()` experiment above passes a plain list — `['name', 'hemal']` — where the docs use key/value data: `view('welcome', ['name' => 'hemal'])`. A plain list becomes the variable `$0`, `$1` in Blade instead of `$name`. Compare with Branch 04's working examples.
 
@@ -943,7 +934,7 @@ flowchart LR
    - `->header('Content-Type', 'text/plain')` → DevTools → Network → Response Headers
    - `view('welcome', ...)` → the welcome Blade page instead of a redirect
 
-> **ℹ️ Note:** `redirect()->route()` must point to a route whose **method matches**. Pointing it at the POST-only `teacher.create-teacher-acc` from a GET follow-up throws `405 MethodNotAllowedHttpException` — that's why this branch names the GET `register` route.
+> **ℹ️ Note:** `redirect()->route('teacher.register')` targets the **GET** `register` route (named in `routes/admin.php`), not the POST-only `teacher.create-teacher-acc`. Following a redirect issues a **GET** — and a GET to a POST-only route throws `405 MethodNotAllowedHttpException`.
 
 ---
 
