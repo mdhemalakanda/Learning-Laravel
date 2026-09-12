@@ -13,6 +13,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`07-Controller`](https://github.com/mdhemalakanda/Learning-Laravel/tree/07-Controller) | Controllers | Invokable (single-action) controllers, resource controllers |
 | [`08-Request`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-Request) | HTTP Requests (Part 1) | Request injection, `all()`, `input()`, `url()`, `path()` |
 | [`08-HTTP-Requests`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-HTTP-Requests) | HTTP Responses (Part 2) | `response()` with headers/cookies, `redirect()`, `view()`, `response()->json()` |
+| [`09-View`](https://github.com/mdhemalakanda/Learning-Laravel/tree/09-View) | Views | `view()` data passing (`compact()`, `with()`), `View::first()` fallback, `View::share()` via service provider |
 
 ---
 
@@ -27,6 +28,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 07 — Controllers](#branch-07--controllers)
 - [Branch 08 — HTTP Requests](#branch-08--http-requests)
 - [Branch 08 (Part 2) — HTTP Responses](#branch-08-part-2--http-responses)
+- [Branch 09 — Views](#branch-09--views)
 
 ---
 
@@ -938,6 +940,124 @@ flowchart LR
 
 ---
 
+## Branch 09 — Views
+
+> **Topic:** Returning Blade views from controllers — three ways to pass data, the `View::first()` fallback chain, and sharing a variable with **all** views via `View::share()` in a service provider.
+> **New files:** `app/Http/Controllers/ViewController.php`, `app/Providers/viewProvider.php`, `app/Models/Settings.php`, `resources/views/view-blade.blade.php`, `resources/views/student/student-details.blade.php`
+> **Modified:** `routes/web.php`, `bootstrap/providers.php`, `database/seeders/DatabaseSeeder.php` (+ new migration, factory, and `SettingsSeeder`)
+> **Official docs:** [Views](https://laravel.com/docs/views) · [Blade Templates](https://laravel.com/docs/blade)
+
+### The Concept
+
+Controllers rarely return raw strings — they **render views**. Laravel resolves a view by its dot-notation name: `student.student-details` maps to `resources/views/student/student-details.blade.php`.
+
+**Passing data to a view** — three equivalent styles, each making the key available as a variable in Blade (`{{ $pageTitle }}`):
+
+| Style | Example |
+| ----- | ------- |
+| Key/value array (most used) | `view('view-blade', ['pageTitle' => $pageTitle])` |
+| `compact()` | `view('view-blade', compact('pageTitle'))` |
+| Chained `with()` | `view('view-blade')->with('pageTitle', $pageTitle)` |
+
+**`View::first()`** — renders the **first view in the array that actually exists**. Useful when views can be customized or overridden: `View::first(['student.student-details', 'welcome'], $data)` falls back to `welcome` if the student view is missing.
+
+**`View::share()`** — makes a variable available to **every** view in the app. The docs recommend calling it from a service provider's `boot()` method (see Branch 02) — the classic use case is site-wide data like app settings. This branch shares a `Settings` model backed by a new `settings` table (migration + factory + seeder).
+
+### The Code
+
+**1. The controller** — three ways to pass `$pageTitle`, with the active line using `View::first()`:
+
+```php
+// app/Http/Controllers/ViewController.php
+public function show_info() {
+    $pageTitle = 'View Page';
+    // return view('view-blade', compact('pageTitle')); // most used
+    // return view('view-blade')->with('pageTitle', $pageTitle);
+    return View::first(['student.student-details', 'welcome'], ['pageTitle' => $pageTitle]);
+}
+```
+
+`View::first()` checks the array left to right: `student.student-details` exists, so that is the view rendered. Delete it, and the fallback `welcome` wins instead.
+
+**2. The route:**
+
+```php
+// routes/web.php
+Route::get('/view-blade', [ViewController::class, 'show_info'])->name('view-blade');
+```
+
+**3. Sharing `$settings` with every view** — in the provider's `boot()` (registered in `bootstrap/providers.php`):
+
+```php
+// app/Providers/viewProvider.php
+use App\Models\Settings;
+use Illuminate\Support\Facades\View;
+
+public function boot(): void
+{
+    // Artisan commands (like `migrate`) also boot providers —
+    // skip the DB query there so the settings table can be created first.
+    if (app()->runningInConsole()) {
+        return;
+    }
+
+    $settings = Settings::first();
+    View::share('settings', $settings);
+
+    // show {{ $settings->phone }} in any blade view
+}
+```
+
+After this, `{{ $settings->phone }}` works in **any** Blade file — both views in this branch print it.
+
+**4. The views:**
+
+```blade
+{{-- resources/views/student/student-details.blade.php --}}
+student details
+
+<p>Phone (shared by View::share): {{ $settings->phone }}</p>
+```
+
+```blade
+{{-- resources/views/view-blade.blade.php --}}
+{{ $pageTitle }}
+
+<p>Phone (shared by View::share): {{ $settings->phone }}</p>
+```
+
+**5. The backing data** — a new `Settings` model with a `phone` column, plus a `SettingsSeeder` (called from `DatabaseSeeder`) so the table has a row:
+
+```bash
+php artisan migrate --seed
+```
+
+> **⚠️ Heads-up:** Providers boot on **every** request *and* every artisan command, so a DB query in `boot()` runs always. The `runningInConsole()` guard stops `php artisan migrate` from querying the `settings` table **before it exists** — without it, migration dies with `no such table: settings` (the command crashes while booting, before it can create the table).
+
+> **⚠️ Heads-up:** The `use App\Models\Settings;` import is mandatory. Without it, PHP resolves `Settings` to `App\Providers\Settings`, which doesn't exist — and since providers boot on every request, **every** route in the app fatal-errors, not just `/view-blade`.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["GET /view-blade"] --> B["viewProvider boot():<br/>View::share('settings', Settings::first())"]
+    B --> C["ViewController::show_info()"]
+    C --> D{"View::first([...])<br/>first view that exists?"}
+    D -- "student.student-details exists" --> E["render it with pageTitle<br/>+ the shared settings"]
+    D -- "missing → fallback" --> F["render welcome instead"]
+    E --> G["Blade prints {{ $pageTitle }}<br/>and {{ $settings->phone }}"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/view-blade` | `student details` + `Phone (shared by View::share): +880 1700-000000` |
+| Temporarily rename `resources/views/student/student-details.blade.php`, revisit | The fallback `welcome` view renders instead — `View::first()` picked the next existing view |
+| Swap the commented lines in `show_info()` | `compact()` and `with()` render the exact same page |
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -967,3 +1087,4 @@ php artisan route:list
 - [Laravel Documentation — HTTP Requests](https://laravel.com/docs/requests)
 - [Laravel Documentation — HTTP Responses](https://laravel.com/docs/responses)
 - [Laravel Documentation — Redirects](https://laravel.com/docs/redirects)
+- [Laravel Documentation — Views](https://laravel.com/docs/views)
