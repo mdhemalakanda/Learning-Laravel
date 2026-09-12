@@ -1,8 +1,15 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\FacadesServiceProvider;
+use App\Providers\MyCustomServiceProvider;
+use App\Providers\TeacherServiceProvider;
+use App\Providers\viewProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\FacadesServiceProvider::class,
-    App\Providers\MyCustomServiceProvider::class,
-    App\Providers\TeacherServiceProvider::class,
+    AppServiceProvider::class,
+    FacadesServiceProvider::class,
+    MyCustomServiceProvider::class,
+    TeacherServiceProvider::class,
+    viewProvider::class,
 ];

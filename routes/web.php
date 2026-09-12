@@ -3,6 +3,7 @@
 use App\Http\Controllers\IndexController;
 use App\Http\Controllers\InvokeController;
 use App\Http\Controllers\ResourceController;
+use App\Http\Controllers\ViewController;
 use Illuminate\Support\Facades\Route;
 
 // Basic Admin Route
@@ -47,3 +48,6 @@ Route::resource('student', IndexController::class); // for crud operation
 
 Route::get('/invoke', InvokeController::class);
 Route::resource('resource', ResourceController::class);
+
+// view class.
+Route::get('/view-blade', [ViewController::class, 'show_info'])->name('view-blade');
