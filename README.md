@@ -11,7 +11,8 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`05-Middleware`](https://github.com/mdhemalakanda/Learning-Laravel/tree/05-Middleware) | Middleware | Custom middleware, middleware aliases, request filtering |
 | [`06-CSRF-Token-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/06-CSRF-Token-Validation) | CSRF Protection | `@csrf` directive, session tokens, POST form handling |
 | [`07-Controller`](https://github.com/mdhemalakanda/Learning-Laravel/tree/07-Controller) | Controllers | Invokable (single-action) controllers, resource controllers |
-| [`08-Request`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-Request) | HTTP Requests | Request injection, `all()`, `input()`, `url()`, `path()` |
+| [`08-Request`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-Request) | HTTP Requests (Part 1) | Request injection, `all()`, `input()`, `url()`, `path()` |
+| [`08-HTTP-Requests`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-HTTP-Requests) | HTTP Responses (Part 2) | `response()` with headers/cookies, `redirect()`, `view()`, `response()->json()` |
 
 ---
 
@@ -25,6 +26,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 06 — CSRF Token Validation](#branch-06--csrf-token-validation)
 - [Branch 07 — Controllers](#branch-07--controllers)
 - [Branch 08 — HTTP Requests](#branch-08--http-requests)
+- [Branch 08 (Part 2) — HTTP Responses](#branch-08-part-2--http-responses)
 
 ---
 
@@ -848,6 +850,103 @@ flowchart LR
 
 ---
 
+## Branch 08 (Part 2) — HTTP Responses
+
+> **Topic:** The other half of the HTTP cycle — everything a controller can **return**: responses with headers and cookies, redirects, views, and JSON.
+> **Modified:** `app/Http/Controllers/TeacherController.php`, `app/Http/Controllers/ResourceController.php`, `routes/admin.php`
+> **Official docs:** [HTTP Responses](https://laravel.com/docs/responses) · [Redirects](https://laravel.com/docs/redirects)
+
+### The Concept
+
+Part 1 (branch `08-Request`) was about **reading** the incoming request. This branch covers what comes back: the **response**. Instead of returning a bare string, a controller returns a **response object** — Laravel's `response()` helper and friends build one for every common need:
+
+| Return | What it produces |
+| ------ | ---------------- |
+| `response('Hello World!', 200)->header('Content-Type', 'text/plain')` | Body + status + a **custom header** |
+| `response('Hello World!', 200)->cookie('name', 'value', 60)` | Body + a **cookie** (60 minutes) |
+| `redirect()->back()` | Redirect to the **previous** URL |
+| `redirect()->route('teacher.register')` | Redirect to a **named route** |
+| `redirect('https://...')` | Redirect to an **external** URL |
+| `view('welcome', [...])` | Render a **Blade view** |
+| `response()->json([...])` | **JSON** response with the correct `Content-Type: application/json` header |
+
+A typical POST handler follows the **PRG pattern** — *Post/Redirect/Get*: catch the data, save it, then **redirect** so a browser refresh doesn't re-submit the form.
+
+### The Code
+
+**1. Name the GET route** — so `redirect()->route(...)` has a name to point at:
+
+```php
+// routes/admin.php
+Route::prefix('teacher')->name('teacher.')->group(function () {
+    Route::get('register', [TeacherController::class, 'show_register_form'])->name('register'); // 👈 named now
+    Route::post('/handle-teacher', [TeacherController::class, 'handle_teacher'])->name('create-teacher-acc');
+});
+```
+
+**2. The POST handler becomes a response playground** — swap the active `return` line:
+
+```php
+// app/Http/Controllers/TeacherController.php
+public function handle_teacher(Request $request, TeacherService $teacher)
+{
+    // pass header.
+    // return response('Hello World!', 200)->header('Content-Type', 'text/plain');
+    // pass cookie.
+    // return response('Hello World!', 200)->cookie('test_cookie', 'Test Cookie', 60);
+
+    // working process.
+    // 1. catch the data.
+    // 2. insert into database.
+    // 3. redirect.
+    // return redirect()->back();
+    // return redirect()->route('teacher.register');
+    // return redirect('https://www.google.com');
+    // return view('welcome', ['name', 'hemal']);
+    return response()->json([
+        'message' => 'json message',
+        'data' => $request->all(),
+    ]);
+}
+```
+
+**3. Bonus:** `ResourceController::create()` now echoes instead of an empty stub:
+
+```php
+public function create()
+{
+    echo 'resource create';
+}
+```
+
+> **⚠️ Heads-up:** The `view()` experiment above passes a plain list — `['name', 'hemal']` — where the docs use key/value data: `view('welcome', ['name' => 'hemal'])`. A plain list becomes the variable `$0`, `$1` in Blade instead of `$name`. Compare with Branch 04's working examples.
+
+### How It Works
+
+```mermaid
+flowchart LR
+    A["Browser POSTs the form<br/>to /teacher/handle-teacher"] --> B["Controller builds a Response:<br/>json() / redirect() / view() / header() / cookie()"]
+    B --> C["Response travels back<br/>through middleware"]
+    C --> D["Browser receives status + headers + body<br/>— or follows the redirect (302)"]
+    D --> E["GET /teacher/register<br/>(refresh-safe: no re-POST)"]
+```
+
+### Try It
+
+1. Submit the form at `/teacher/register`.
+2. The active `return response()->json(...)` gives:
+   `{"message":"json message","data":{"username":"...","password":"...","register_teacher":"Register","_token":"..."}}`
+3. Swap in the other returns and observe the difference:
+   - `redirect()->back()` → browser lands back on the form (classic PRG flow)
+   - `redirect()->route('teacher.register')` → same, but by route **name** — survives future URL changes
+   - `->cookie('test_cookie', ...)` → DevTools → Application → Cookies → `test_cookie`
+   - `->header('Content-Type', 'text/plain')` → DevTools → Network → Response Headers
+   - `view('welcome', ...)` → the welcome Blade page instead of a redirect
+
+> **ℹ️ Note:** `redirect()->route()` must point to a route whose **method matches**. Pointing it at the POST-only `teacher.create-teacher-acc` from a GET follow-up throws `405 MethodNotAllowedHttpException` — that's why this branch names the GET `register` route.
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -874,3 +973,6 @@ php artisan route:list
 - [Laravel Documentation — CSRF Protection](https://laravel.com/docs/csrf)
 - [Laravel Documentation — Blade Templates](https://laravel.com/docs/blade)
 - [Laravel Documentation — Controllers](https://laravel.com/docs/controllers)
+- [Laravel Documentation — HTTP Requests](https://laravel.com/docs/requests)
+- [Laravel Documentation — HTTP Responses](https://laravel.com/docs/responses)
+- [Laravel Documentation — Redirects](https://laravel.com/docs/redirects)
