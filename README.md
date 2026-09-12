@@ -14,6 +14,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`08-Request`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-Request) | HTTP Requests (Part 1) | Request injection, `all()`, `input()`, `url()`, `path()` |
 | [`08-HTTP-Requests`](https://github.com/mdhemalakanda/Learning-Laravel/tree/08-HTTP-Requests) | HTTP Responses (Part 2) | `response()` with headers/cookies, `redirect()`, `view()`, `response()->json()` |
 | [`09-View`](https://github.com/mdhemalakanda/Learning-Laravel/tree/09-View) | Views | `view()` data passing (`compact()`, `with()`), `View::first()` fallback, `View::share()` via service provider |
+| [`10-URL-Generation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/10-URL-Generation) | URL Generation | `url()` helper, `url()->current()` / `full()` / `previous()`, `url()` vs `route()` |
 
 ---
 
@@ -29,6 +30,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 08 — HTTP Requests](#branch-08--http-requests)
 - [Branch 08 (Part 2) — HTTP Responses](#branch-08-part-2--http-responses)
 - [Branch 09 — Views](#branch-09--views)
+- [Branch 10 — URL Generation](#branch-10--url-generation)
 
 ---
 
@@ -1156,6 +1158,80 @@ flowchart TD
 
 ---
 
+## Branch 10 — URL Generation
+
+> **Topic:** Generating URLs with the `url()` helper, inspecting the incoming request's URL with the `url()->...` accessors, and the difference between `url()` and `route()`.
+> **Modified:** `resources/views/welcome.blade.php`
+> **Official docs:** [URLs](https://laravel.com/docs/urls)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `resources/views/welcome.blade.php` | Playground view — builds a link with `url()`, prints the current / full / previous URL accessors |
+| `routes/admin.php` | Defines the `std.teacher` route the links point at (from Branch 04) |
+
+### The Concept
+
+Laravel's URL generator builds links in two fundamentally different ways:
+
+| Helper | Builds from | Example output |
+| ------ | ----------- | -------------- |
+| `url('path')` | A raw **path** | `url('admin/settings')` → `http://app.test/admin/settings` |
+| `route('name', [...])` | A **named route** | `route('std.teacher', ['name' => 'john'])` → `http://app.test/student/teacher/john` |
+
+The same `url()` function also doubles as an inspector for the **incoming request's** URL:
+
+| Accessor | Returns |
+| -------- | ------- |
+| `url()->current()` | The current URL **without** the query string |
+| `url()->full()` | The current URL **including** the query string |
+| `url()->previous()` | The URL the visitor came from (the `Referer` header), falling back to `/` |
+
+### The Code
+
+```blade
+{{-- resources/views/welcome.blade.php --}}
+<h1><a href="{{ route('std.teacher', ['name' => 'MD Hemal Akhand', 'age' => 30]) }}">Teacher</a></h1>
+<a href="{{ urL('std.teacher', ['name' => 'john']) }}">Teacher</a><br/><br/>
+Current URL: {{ url()->current() }}<br/><br/>
+Current Full URL: {{ url()->full() }}<br/><br/>
+previous URL: {{ url()->previous() }}<br/><br/>
+```
+
+(PHP helper names are case-insensitive, so `urL()` behaves exactly like `url()`.)
+
+What each line produces:
+
+- `route('std.teacher', ['name' => ..., 'age' => 30])` — the named route with `name` filling the `{name}` placeholder and the extra `age` becoming a query string: `/student/teacher/MD Hemal Akhand?age=30`
+- `url('std.teacher', ['name' => 'john'])` — a **path** URL; array parameters are collapsed into **path segments**: `/std.teacher/john`
+- `url()->current()` vs `url()->full()` — identical here; add `?x=1` to the address bar and `full()` keeps it while `current()` drops it
+- `url()->previous()` — `/` on a direct visit (no referrer), otherwise the page you came from
+
+> **⚠️ Heads-up:** `url()` does **not** resolve route names. `url('std.teacher', ...)` builds the literal path `/std.teacher/john`, which matches no route — clicking the second link gives a **404**. The `route()` link above it works because named routes are its job. Compare the two links side by side on `/`.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["Browser opens /"] --> B["Blade renders welcome view"]
+    B --> C["route('std.teacher', ...)<br/>named route → /student/teacher/MD Hemal Akhand?age=30"]
+    B --> D["url('std.teacher', ...)<br/>raw path + segments → /std.teacher/john (404)"]
+    B --> E["url()->current() / full()<br/>describe THIS request's URL"]
+    B --> F["url()->previous()<br/>Referer header, fallback /"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/` (direct visit) | Top link → `/student/teacher/MD Hemal Akhand?age=30`; second link → `/std.teacher/john`; Current = Full URL = `http://<host>/`; previous = `/` |
+| Add `?x=1` to `/` and reload | `Current Full URL` now shows the `?x=1`, `Current URL` doesn't |
+| Click the **second** Teacher link | `404` — proof that `url()` built a path, not a route URL |
+| Click the **top** Teacher link | `Teacher name: MD Hemal Akhand` with `?age=30` in the query string |
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -1186,3 +1262,4 @@ php artisan route:list
 - [Laravel Documentation — HTTP Responses](https://laravel.com/docs/responses)
 - [Laravel Documentation — Redirects](https://laravel.com/docs/redirects)
 - [Laravel Documentation — Views](https://laravel.com/docs/views)
+- [Laravel Documentation — URLs](https://laravel.com/docs/urls)
