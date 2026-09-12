@@ -16,6 +16,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`09-View`](https://github.com/mdhemalakanda/Learning-Laravel/tree/09-View) | Views | `view()` data passing (`compact()`, `with()`), `View::first()` fallback, `View::share()` via service provider |
 | [`10-URL-Generation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/10-URL-Generation) | URL Generation | `url()` helper, `url()->current()` / `full()` / `previous()`, `url()` vs `route()` |
 | [`11-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/11-Validation) | Validation | `$request->validate()`, validation rules, `$errors` bag, `@error` directive |
+| [`12-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/12-Custom-Validation) | Custom Validation | Form Request class, `authorize()`, `rules()`, automatic validation via controller type-hint |
 
 ---
 
@@ -33,6 +34,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 09 — Views](#branch-09--views)
 - [Branch 10 — URL Generation](#branch-10--url-generation)
 - [Branch 11 — Validation](#branch-11--validation)
+- [Branch 12 — Custom Validation (Form Requests)](#branch-12--custom-validation-form-requests)
 
 ---
 
@@ -1340,6 +1342,128 @@ flowchart TD
 
 ---
 
+## Branch 12 — Custom Validation (Form Requests)
+
+> **Topic:** Moving validation out of the controller into a dedicated **Form Request** class that validates automatically.
+> **New files:** `app/Http/Requests/UserReqValidate.php`
+> **Modified:** `app/Http/Controllers/userInfo.php`
+> **Official docs:** [Validation — Form Request Validation](https://laravel.com/docs/validation#form-request-validation)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Requests/UserReqValidate.php` | The Form Request — `authorize()` + `rules()` encapsulated in one class |
+| `app/Http/Controllers/userInfo.php` | `handleUserReq()` — just type-hints `UserReqValidate` and uses the data |
+| `routes/web.php` | POST `/user-registration` route (unchanged from Branch 11) |
+| `resources/views/welcome.blade.php` | The Branch 11 form with `@error` blocks (unchanged — Form Requests reuse the same `$errors` bag) |
+
+### The Concept
+
+A **Form Request** is a custom request class that **encapsulates its own validation and authorization logic**. For complex validation scenarios it keeps rules out of the controller. Generate one with Artisan:
+
+```bash
+php artisan make:request UserReqValidate
+```
+
+The class lands in `app/Http/Requests/` with two methods:
+
+| Method | Purpose |
+| ------ | ------- |
+| `authorize()` | Decide if the current user may perform this action. Return `false` → automatic **403** response. Return `true` to allow. |
+| `rules()` | Return the validation rules array — same rules you wrote inline in Branch 11. |
+
+The magic is in how it gets used: **type-hint the Form Request in your controller method**. The **service container** (Branches 01/02) resolves it, and Laravel validates the incoming data **before your controller method body even runs**. If any rule fails, the familiar `ValidationException` fires — redirect back with the errors flashed into `$errors`, exactly like Branch 11. If it passes, the method body runs with valid data.
+
+### The Code
+
+**1. The Form Request class** — rules from Branch 11 moved into `rules()`:
+
+```php
+// app/Http/Requests/UserReqValidate.php
+namespace App\Http\Requests;
+
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+
+class UserReqValidate extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'username' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'max: 50', 'min: 6'],
+        ];
+    }
+}
+```
+
+**2. The controller** — the type-hint changes from `Request` to `UserReqValidate`, and the inline rules are gone:
+
+```php
+// app/Http/Controllers/userInfo.php
+use App\Http\Requests\UserReqValidate;
+
+class userInfo extends Controller
+{
+    public function handleUserReq(UserReqValidate $request)
+    {
+        $request->rules();
+
+        dd($request->all());
+    }
+}
+```
+
+**3. Route and form** — unchanged from Branch 11. The form still posts to `handle-user`, and `@error` still reads from the shared `$errors` bag:
+
+```php
+// routes/web.php
+Route::post('/user-registration', [userInfo::class, 'handleUserReq'])->name('handle-user');
+```
+
+> **⚠️ Heads-up:** Validation runs **automatically, before** `handleUserReq()` executes. The `$request->rules()` call inside the method does **nothing** — it only returns the rules array. It's harmless, but you can delete it. Also, the canonical rule syntax has no space after the colon: `max:50`, not `max: 50` — the spaced version works here, but stick to the canonical form.
+
+> **ℹ️ Note:** Inside the method you'd normally grab only the validated fields with `$request->validated()` or `$request->safe()->only([...])` instead of `$request->all()` — that's the payoff of the Form Request: a guaranteed-clean data set.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["Browser submits form<br/>POST /user-registration"] --> B["Container sees the UserReqValidate type-hint<br/>and resolves the Form Request"]
+    B --> C{"authorize()?"}
+    C -- "returns false" --> D["Automatic 403 response<br/>(method never runs)"]
+    C -- "returns true" --> E{"rules() pass?"}
+    E -- "any rule fails" --> F["ValidationException<br/>→ redirect back, errors flashed"]
+    F --> G["$errors bag + @error in Blade<br/>(same as Branch 11)"]
+    E -- "all rules pass" --> H["handleUserReq() body runs<br/>dd() dumps the input"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/` | The registration form (identical to Branch 11) |
+| Submit empty | Redirected back — `required` messages under the fields and in the top summary |
+| Submit with password `abc` | `The password field must be at least 6 characters.` |
+| Submit valid data | `dd()` dump — validation passed before the method body ran |
+| Temporarily return `false` from `authorize()` and submit | Automatic `403 Forbidden` — the controller method never runs |
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -1372,3 +1496,4 @@ php artisan route:list
 - [Laravel Documentation — Views](https://laravel.com/docs/views)
 - [Laravel Documentation — URLs](https://laravel.com/docs/urls)
 - [Laravel Documentation — Validation](https://laravel.com/docs/validation)
+- [Laravel Documentation — Form Request Validation](https://laravel.com/docs/validation#form-request-validation)
