@@ -35,6 +35,16 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 > **Modified:** `app/Providers/AppServiceProvider.php`, `routes/web.php`
 > **Official docs:** [Service Container](https://laravel.com/docs/container) · [Service Providers](https://laravel.com/docs/providers)
 
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/service/Logger.php` | Plain service class — `log()` prefixes a message with `[logger]:` |
+| `app/service/Notice.php` | Plain service class — `print()` prefixes a message with `Notice:` |
+| `app/Providers/AppServiceProvider.php` | `register()` binds `Notice::class`, teaching the container how to build it |
+| `app/Http/Controllers/userInfo.php` | Controller — type-hints `Logger` / `Notice`; the container injects them |
+| `routes/web.php` | `/user-info` and `/notice` routes pointing at the controller |
+
 ### The Concept
 
 The **Service Container** (also called the IoC container) is a powerful tool for managing **class dependencies** and performing **dependency injection**. Instead of a class creating its own dependencies with `new`, you simply *type-hint* what you need and Laravel's container **automatically builds and injects it** for you.
@@ -133,6 +143,16 @@ flowchart LR
 > **New files:** `app/Providers/MyCustomServiceProvider.php`, `app/service/MyCustomService.php`, `app/Http/Controllers/MyCustomServiceController.php`
 > **Modified:** `bootstrap/providers.php`, `routes/web.php`
 > **Official docs:** [Service Providers](https://laravel.com/docs/providers) · [Service Container](https://laravel.com/docs/container)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/service/MyCustomService.php` | The service — `greet()` returns the hello string |
+| `app/Providers/MyCustomServiceProvider.php` | Your own provider — where the container binding is intended (see the heads-up below) |
+| `app/Http/Controllers/MyCustomServiceController.php` | Injects `MyCustomService` and echoes `greet()` |
+| `bootstrap/providers.php` | Registers the provider so Laravel loads it on every request |
+| `routes/web.php` | The `/mycustomservice` route |
 
 ### The Concept
 
@@ -249,6 +269,16 @@ flowchart TD
 > **Modified:** `app/Http/Controllers/MyCustomServiceController.php`, `bootstrap/providers.php`
 > **Official docs:** [Facades](https://laravel.com/docs/facades)
 
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/service/FacadesService.php` | The real worker — static `welcome()` builds the greeting |
+| `app/Providers/FacadesServiceProvider.php` | Binds the service into the container under the key `facades_service` (see the heads-up below) |
+| `app/Facades/MyFacades.php` | The custom facade — `getFacadeAccessor()` returns `facades_service`; `__callStatic()` forwards the static call to the container-resolved instance |
+| `app/Http/Controllers/MyCustomServiceController.php` | `show_service()` — the entry point that calls the service |
+| `bootstrap/providers.php` | Registers `FacadesServiceProvider` |
+
 ### The Concept
 
 A **facade** is a class that provides a **static-like interface to services stored in the service container**. Facades serve as *proxies* for accessing underlying classes — they make code shorter and more expressive, without making the code hard to test.
@@ -354,6 +384,18 @@ sequenceDiagram
 > **New files:** `routes/admin.php`, `app/Http/Controllers/AdminController.php`, `app/Http/Controllers/IndexController.php`, `app/service/StudentService.php`
 > **Modified:** `bootstrap/app.php`, `routes/web.php`, `resources/views/welcome.blade.php`
 > **Official docs:** [Routing](https://laravel.com/docs/routing) · [Controllers](https://laravel.com/docs/controllers)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `routes/admin.php` | The second route file — `student/teacher/{name}` group named `std.teacher` |
+| `app/Http/Controllers/IndexController.php` | Target of the hand-written CRUD group and `Route::resource('student', ...)` |
+| `app/Http/Controllers/AdminController.php` | Practices service injection — `get_stuents(StudentService $student)` echoes the student list |
+| `app/service/StudentService.php` | Returns the placeholder student-list string |
+| `bootstrap/app.php` | `withRouting(web: [web.php, admin.php])` — loads both route files |
+| `routes/web.php` | Prefix/name groups, `{id}` parameters, resource route |
+| `resources/views/welcome.blade.php` | Link hub — generates its link with `route('std.teacher', ...)` |
 
 ### The Concept — Route Groups
 
@@ -463,6 +505,14 @@ Route::prefix('student')->name('std.')->group(function() {
 > **Modified:** `bootstrap/app.php`, `routes/admin.php`
 > **Official docs:** [Middleware](https://laravel.com/docs/middleware)
 
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Middleware/IsStudentValid.php` | The middleware — rejects `age <= 20` with a JSON error, otherwise calls `$next($request)` |
+| `bootstrap/app.php` | Registers the alias `student_middleware` → `IsStudentValid::class` |
+| `routes/admin.php` | Attaches `->middleware('student_middleware')` to the teacher route |
+
 ### The Concept
 
 Middleware provide a convenient mechanism to **inspect and filter HTTP requests** entering your application. Each request passes through middleware layers **before** reaching your route/controller, and the response passes back through them.
@@ -549,6 +599,17 @@ Route::prefix('student')->name('std.')->group(function() {
 > **New files:** `app/Http/Controllers/TeacherController.php`, `app/Providers/TeacherServiceProvider.php`, `app/service/TeacherService.php`, `resources/views/teacher-registration.blade.php`
 > **Modified:** `routes/admin.php`, `bootstrap/providers.php`
 > **Official docs:** [CSRF Protection](https://laravel.com/docs/csrf) · [Blade `@csrf`](https://laravel.com/docs/blade#csrf-field)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `resources/views/teacher-registration.blade.php` | The Blade form — `method="POST"` plus the `@csrf` hidden token field |
+| `app/Http/Controllers/TeacherController.php` | `show_register_form()` renders the form; `handle_teacher()` handles the POST |
+| `app/service/TeacherService.php` | `handle_acc()` dumps the submitted data (`dd($_POST)`) |
+| `app/Providers/TeacherServiceProvider.php` | Provides `TeacherService` into the container |
+| `routes/admin.php` | GET `register` + POST `handle-teacher` (named `teacher.create-teacher-acc`) |
+| `bootstrap/providers.php` | Registers `TeacherServiceProvider` |
 
 ### The Concept
 
@@ -671,6 +732,14 @@ sequenceDiagram
 > **Modified:** `routes/web.php`
 > **Official docs:** [Controllers](https://laravel.com/docs/controllers)
 
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Controllers/InvokeController.php` | Invokable (single-action) controller — one `__invoke()` method, routed by class name only |
+| `app/Http/Controllers/ResourceController.php` | Resource controller — all 7 CRUD action methods |
+| `routes/web.php` | `/invoke` (class only, no `[Class, method]` array) + `Route::resource('resource', ...)` |
+
 ### The Concept
 
 Controllers group related request-handling logic into one class. Two special flavors:
@@ -787,6 +856,13 @@ Route::resource('resource', ResourceController::class);
 > **Topic:** The `Illuminate\Http\Request` object — how Laravel represents an incoming request and the accessors for reading its data.
 > **Modified:** `app/Http/Controllers/TeacherController.php`
 > **Official docs:** [HTTP Requests](https://laravel.com/docs/requests)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Http/Controllers/TeacherController.php` | `handle_teacher()` — Request accessors (`all()`, `input()`, `url()`, `path()`) behind uncommented `dd()` lines |
+| `resources/views/teacher-registration.blade.php` | The Branch 06 form you submit to feed the Request |
 
 ### The Concept
 
