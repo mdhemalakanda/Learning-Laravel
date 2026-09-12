@@ -19,7 +19,7 @@ class ResourceController extends Controller
      */
     public function create()
     {
-        //
+        echo 'resource create';
     }
 
     /**
