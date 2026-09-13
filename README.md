@@ -16,7 +16,8 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`09-View`](https://github.com/mdhemalakanda/Learning-Laravel/tree/09-View) | Views | `view()` data passing (`compact()`, `with()`), `View::first()` fallback, `View::share()` via service provider |
 | [`10-URL-Generation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/10-URL-Generation) | URL Generation | `url()` helper, `url()->current()` / `full()` / `previous()`, `url()` vs `route()` |
 | [`11-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/11-Validation) | Validation | `$request->validate()`, validation rules, `$errors` bag, `@error` directive |
-| [`12-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/12-Custom-Validation) | Custom Validation | Form Request class, `authorize()`, `rules()`, automatic validation via controller type-hint |
+| [`12-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/12-Custom-Validation) | Custom Validation (Form Requests) | Form Request class, `authorize()`, `rules()`, automatic validation via controller type-hint |
+| [`13-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/13-Custom-Validation) | Custom Validation Rules | Rule objects, `make:rule`, `ValidationRule::validate()`, `$fail()` callback |
 
 ---
 
@@ -35,6 +36,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 10 — URL Generation](#branch-10--url-generation)
 - [Branch 11 — Validation](#branch-11--validation)
 - [Branch 12 — Custom Validation (Form Requests)](#branch-12--custom-validation-form-requests)
+- [Branch 13 — Custom Validation Rules (Rule Objects)](#branch-13--custom-validation-rules-rule-objects)
 
 ---
 
@@ -1464,6 +1466,117 @@ flowchart TD
 
 ---
 
+## Branch 13 — Custom Validation Rules (Rule Objects)
+
+> **Topic:** Writing your **own validation rule as a class** (a *rule object*) with `php artisan make:rule`, and attaching it to the Form Request's `rules()`.
+> **New files:** `app/Rules/Uppercase.php`
+> **Modified:** `app/Http/Requests/UserReqValidate.php`
+> **Official docs:** [Validation — Custom Validation Rules](https://laravel.com/docs/validation#custom-validation-rules) · [Using Rule Objects](https://laravel.com/docs/validation#using-rule-objects)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Rules/Uppercase.php` | The rule object — one `validate()` method; calls `$fail()` when the value is not uppercase |
+| `app/Http/Requests/UserReqValidate.php` | Branch 12's Form Request — `username` now also gets `new Uppercase` in its rules array |
+| `resources/views/welcome.blade.php` | The Branch 11 form (unchanged — the custom rule's message flows into the same `@error('username')` block) |
+| `routes/web.php` | POST `/user-registration` route (unchanged) |
+
+### The Concept
+
+Laravel ships with dozens of rules (`required`, `min:6`, ...), but you can package **any check you like as a reusable rule object**. Generate one with Artisan — Laravel creates the `app/Rules` directory if it doesn't exist:
+
+```bash
+php artisan make:rule Uppercase
+```
+
+A rule object implements `Illuminate\Contracts\Validation\ValidationRule` and contains a **single method**:
+
+| Piece | Purpose |
+| ----- | ------- |
+| `validate(string $attribute, mixed $value, Closure $fail): void` | Runs against each value. Do your check here. |
+| `$fail('message')` | Call it to **fail** the rule. `:attribute` in the message is replaced with the field name (`username`). |
+
+Attach the rule by passing an **instance** alongside the built-in rules — mix and match freely:
+
+```php
+'username' => ['required', 'string', 'max:255', new Uppercase],
+```
+
+> **ℹ️ Note:** Custom rules **don't run on empty/missing values** — that's why `required` still handles the empty case. For a rule that runs even when the field is empty, generate it with `php artisan make:rule Uppercase --implicit` (the rule still decides itself whether an empty value passes).
+>
+> For a one-off check you'll never reuse, the docs also allow an **inline closure** with the same `(string $attribute, mixed $value, Closure $fail)` signature in place of a rule object.
+
+### The Code
+
+**1. The rule object** — `strtoupper($value) !== $value` means the value contains at least one lowercase letter, so the rule fails:
+
+```php
+// app/Rules/Uppercase.php
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Translation\PotentiallyTranslatedString;
+
+class Uppercase implements ValidationRule
+{
+    /**
+     * Run the validation rule.
+     *
+     * @param  Closure(string, ?string=): PotentiallyTranslatedString  $fail
+     */
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (strtoupper($value) !== $value) {
+            $fail('The :attribute must be uppercase.');
+        }
+    }
+}
+```
+
+**2. Using it in the Form Request** — import the class and add `new Uppercase` to the `username` rules from Branch 12:
+
+```php
+// app/Http/Requests/UserReqValidate.php
+use App\Rules\Uppercase;
+
+public function rules(): array
+{
+    return [
+        'username' => ['required', 'string', 'max:255', new Uppercase],
+        'password' => ['required', 'max: 50', 'min: 6'],
+    ];
+}
+```
+
+**3. Route and form** — unchanged from Branches 11/12. The rule's failure message lands in the same `$errors` bag, so `@error('username')` displays it with no form changes.
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["Browser submits form<br/>POST /user-registration"] --> B["Container resolves UserReqValidate<br/>rules() includes new Uppercase"]
+    B --> C{"Each rule runs on 'username'"}
+    C -- "empty value" --> D["required fails<br/>(custom rules skip empty values)"]
+    C -- "value = 'hemal'" --> E["Uppercase::validate()<br/>strtoupper('hemal') !== 'hemal'"]
+    E --> F["$fail('The :attribute must be uppercase.')<br/>→ ValidationException → redirect back"]
+    F --> G["@error('username') prints<br/>'The username must be uppercase.'"]
+    C -- "value = 'HEMAL'" --> H["All rules pass<br/>dd() dumps the input"]
+```
+
+### Try It
+
+| URL | Result |
+| --- | ------ |
+| `/` | The registration form (identical to Branch 11/12) |
+| Submit with username `hemal` | Redirected back — `The username must be uppercase.` under the field |
+| Submit with username `HEMAL` | `dd()` dump — the custom rule passed |
+| Submit empty | Only the `required` messages fire — the custom rule doesn't run on empty values |
+| Submit username `HEMAL` with password `abc` | The `min:6` password message — each field's rules fail independently |
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -1497,3 +1610,4 @@ php artisan route:list
 - [Laravel Documentation — URLs](https://laravel.com/docs/urls)
 - [Laravel Documentation — Validation](https://laravel.com/docs/validation)
 - [Laravel Documentation — Form Request Validation](https://laravel.com/docs/validation#form-request-validation)
+- [Laravel Documentation — Custom Validation Rules](https://laravel.com/docs/validation#custom-validation-rules)
