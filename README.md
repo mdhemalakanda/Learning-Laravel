@@ -16,7 +16,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | [`09-View`](https://github.com/mdhemalakanda/Learning-Laravel/tree/09-View) | Views | `view()` data passing (`compact()`, `with()`), `View::first()` fallback, `View::share()` via service provider |
 | [`10-URL-Generation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/10-URL-Generation) | URL Generation | `url()` helper, `url()->current()` / `full()` / `previous()`, `url()` vs `route()` |
 | [`11-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/11-Validation) | Validation | `$request->validate()`, validation rules, `$errors` bag, `@error` directive |
-| [`12-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/12-Custom-Validation) | Custom Validation (Form Requests) | Form Request class, `authorize()`, `rules()`, automatic validation via controller type-hint |
+| *(folded into* [`13-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/13-Custom-Validation)*)* | Custom Validation (Form Requests) | Form Request class, `authorize()`, `rules()`, automatic validation via controller type-hint |
 | [`13-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/13-Custom-Validation) | Custom Validation Rules | Rule objects, `make:rule`, `ValidationRule::validate()`, `$fail()` callback |
 
 ---
@@ -1350,6 +1350,7 @@ flowchart TD
 > **New files:** `app/Http/Requests/UserReqValidate.php`
 > **Modified:** `app/Http/Controllers/userInfo.php`
 > **Official docs:** [Validation — Form Request Validation](https://laravel.com/docs/validation#form-request-validation)
+> **ℹ️ Note:** The dedicated `12-Custom-Validation` branch was folded into `13-Custom-Validation` — check out Branch 13 to see this lesson's code (its Form Request there also includes Branch 13's `Uppercase` rule).
 
 ### Files in This Lesson
 
