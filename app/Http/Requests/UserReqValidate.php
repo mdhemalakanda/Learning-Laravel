@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\Uppercase;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -23,7 +24,7 @@ class UserReqValidate extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', new Uppercase],
             'password' => ['required', 'max: 50', 'min: 6'],
         ];
     }
