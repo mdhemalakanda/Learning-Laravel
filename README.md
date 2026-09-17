@@ -69,7 +69,7 @@ When a type-hinted dependency is a **concrete class** (not an interface), Larave
 
 ### The Code
 
-**1. Simple service classes** — plain PHP classes with no Laravel magic:
+**Step 1: Simple service classes** — plain PHP classes with no Laravel magic:
 
 ```php
 // app/service/Logger.php
@@ -93,7 +93,7 @@ class Notice {
 }
 ```
 
-**2. Register a binding in the service provider** — this teaches the container *how* to build `Notice` when it is ever requested:
+**Step 2: Register a binding in the service provider** — this teaches the container *how* to build `Notice` when it is ever requested:
 
 ```php
 // app/Providers/AppServiceProvider.php
@@ -105,7 +105,7 @@ public function register(): void
 }
 ```
 
-**3. Inject the services into a controller** — just type-hint them in the method signature. The container sees the type-hints and injects ready-to-use objects:
+**Step 3: Inject the services into a controller** — just type-hint them in the method signature. The container sees the type-hints and injects ready-to-use objects:
 
 ```php
 // app/Http/Controllers/userInfo.php
@@ -125,7 +125,7 @@ class userInfo extends Controller
 }
 ```
 
-**4. Wire up routes:**
+**Step 4: Wire up routes:**
 
 ```php
 // routes/web.php
@@ -187,7 +187,7 @@ php artisan make:provider MyCustomServiceProvider
 
 ### The Code
 
-**1. The custom service:**
+**Step 1: The custom service:**
 
 ```php
 // app/service/MyCustomService.php
@@ -200,7 +200,7 @@ class MyCustomService {
 }
 ```
 
-**2. The custom service provider** — intended to bind the service so the container knows about it:
+**Step 2: The custom service provider** — intended to bind the service so the container knows about it:
 
 ```php
 // app/Providers/MyCustomServiceProvider.php
@@ -227,7 +227,7 @@ class MyCustomServiceProvider extends ServiceProvider
 
 > **⚠️ Heads-up:** The canonical container-binding method is `$this->app->bind(...)`, not `boot()`. `Application::boot()` takes no arguments, so the extra arguments here are silently ignored — the binding is never actually registered. The injection in the controller still works because Laravel resolves **concrete classes with zero configuration** (pure reflection), no binding required. Compare with Branch 01, which uses `bind()` correctly.
 
-**3. Register the provider** so Laravel loads it on every request:
+**Step 3: Register the provider** so Laravel loads it on every request:
 
 ```php
 // bootstrap/providers.php
@@ -237,7 +237,7 @@ return [
 ];
 ```
 
-**4. Inject it into a controller** — again, just a type-hint:
+**Step 4: Inject it into a controller** — again, just a type-hint:
 
 ```php
 // app/Http/Controllers/MyCustomServiceController.php
@@ -251,7 +251,7 @@ class MyCustomServiceController extends Controller
 }
 ```
 
-**5. The route:**
+**Step 5: The route:**
 
 ```php
 Route::get('/mycustomservice', [MyCustomServiceController::class, 'show_service']);
@@ -309,7 +309,7 @@ So when you write `Cache::get(...)`, no static method `get` actually exists on t
 
 ### The Code
 
-**1. The underlying service class** (the real worker, with a `static` method):
+**Step 1: The underlying service class** (the real worker, with a `static` method):
 
 ```php
 // app/service/FacadesService.php
@@ -322,7 +322,7 @@ class FacadesService {
 }
 ```
 
-**2. Bind it into the container under a string key** (the provider is registered in `bootstrap/providers.php`, same as Branch 02):
+**Step 2: Bind it into the container under a string key** (the provider is registered in `bootstrap/providers.php`, same as Branch 02):
 
 ```php
 // app/Providers/FacadesServiceProvider.php
@@ -336,7 +336,7 @@ public function register(): void
 
 > **⚠️ Heads-up:** Same note as Branch 02 — use `$this->app->bind('facades_service', fn ($app) => new FacadesService())` to actually register the binding in the container. A facade's `getFacadeAccessor()` must return a key that **really exists as a container binding**, otherwise the facade call fails.
 
-**3. The custom facade** — its only job is to map "static calls" to the `facades_service` binding:
+**Step 3: The custom facade** — its only job is to map "static calls" to the `facades_service` binding:
 
 ```php
 // app/Facades/MyFacades.php
@@ -351,7 +351,7 @@ class MyFacades extends Facade {
 }
 ```
 
-**4. Usage in the controller:**
+**Step 4: Usage in the controller:**
 
 ```php
 // app/Http/Controllers/MyCustomServiceController.php
@@ -422,7 +422,7 @@ Route groups let you **share attributes** (prefix, name prefix, middleware) acro
 
 ### The Code
 
-**1. Grouping with prefix + name prefix:**
+**Step 1: Grouping with prefix + name prefix:**
 
 ```php
 // routes/web.php
@@ -438,7 +438,7 @@ Route::name('admin.')->prefix('learnhunter')->group(function () {
 });
 ```
 
-**2. Dynamic route parameters** — capture URI segments in `{braces}`; they are injected into your closure/controller by order:
+**Step 2: Dynamic route parameters** — capture URI segments in `{braces}`; they are injected into your closure/controller by order:
 
 ```php
 Route::get('/view-student/{id}', function (string $id) {
@@ -446,7 +446,7 @@ Route::get('/view-student/{id}', function (string $id) {
 });
 ```
 
-**3. A hand-written CRUD group** (index, create, store, show, edit, update, destroy):
+**Step 3: A hand-written CRUD group** (index, create, store, show, edit, update, destroy):
 
 ```php
 Route::prefix('students')->name('students.')->group(function () {
@@ -460,7 +460,7 @@ Route::prefix('students')->name('students.')->group(function () {
 });
 ```
 
-**4. The shortcut for exactly that CRUD pattern** — a single line registers all seven resource routes:
+**Step 4: The shortcut for exactly that CRUD pattern** — a single line registers all seven resource routes:
 
 ```php
 Route::resource('student', \App\Http\Controllers\IndexController::class); // for crud operation
@@ -468,7 +468,7 @@ Route::resource('student', \App\Http\Controllers\IndexController::class); // for
 
 > **ℹ️ Note:** This group exists purely as **practice** for writing routes manually. For real CRUD, prefer `Route::resource()`. (The scaffolded `IndexController` in this branch is still empty, so these routes are demos of routing, not working pages.)
 
-**5. Registering a second route file** — routes don't have to live in `web.php` only. Add extra files to `withRouting()` in `bootstrap/app.php`:
+**Step 5: Registering a second route file** — routes don't have to live in `web.php` only. Add extra files to `withRouting()` in `bootstrap/app.php`:
 
 ```php
 // bootstrap/app.php
@@ -495,7 +495,7 @@ Route::prefix('student')->name('std.')->group(function() {
 });
 ```
 
-**6. Generating links with `route()`** — prefer named routes over hardcoded URLs. The welcome page becomes a simple link hub:
+**Step 6: Generating links with `route()`** — prefer named routes over hardcoded URLs. The welcome page becomes a simple link hub:
 
 ```blade
 {{-- resources/views/welcome.blade.php --}}
@@ -546,7 +546,7 @@ flowchart LR
 
 ### The Code
 
-**1. The custom middleware** — reject any request whose `age` is not greater than 20:
+**Step 1: The custom middleware** — reject any request whose `age` is not greater than 20:
 
 ```php
 // app/Http/Middleware/IsStudentValid.php
@@ -576,7 +576,7 @@ class IsStudentValid
 }
 ```
 
-**2. Register a short alias** in `bootstrap/app.php` — aliases save you from writing long class names on every route:
+**Step 2: Register a short alias** in `bootstrap/app.php` — aliases save you from writing long class names on every route:
 
 ```php
 // bootstrap/app.php
@@ -589,7 +589,7 @@ use App\Http\Middleware\IsStudentValid;
 })
 ```
 
-**3. Attach it to a route** using the alias:
+**Step 3: Attach it to a route** using the alias:
 
 ```php
 // routes/admin.php
@@ -645,7 +645,7 @@ You can access the current token via `$request->session()->token()` or the `csrf
 
 ### The Code
 
-**1. A Blade registration form** — note the two essentials: `method="POST"` and the `@csrf` directive (without it, this form would get a `419` error):
+**Step 1: A Blade registration form** — note the two essentials: `method="POST"` and the `@csrf` directive (without it, this form would get a `419` error):
 
 ```blade
 {{-- resources/views/teacher-registration.blade.php --}}
@@ -657,7 +657,7 @@ You can access the current token via `$request->session()->token()` or the `csrf
 </form>
 ```
 
-**2. Controller** — shows the form on GET, handles the POST. `$request->session()->token()` reads the session's CSRF token (the same value `@csrf` put into the form):
+**Step 2: Controller** — shows the form on GET, handles the POST. `$request->session()->token()` reads the session's CSRF token (the same value `@csrf` put into the form):
 
 ```php
 // app/Http/Controllers/TeacherController.php
@@ -679,7 +679,7 @@ class TeacherController extends Controller
 }
 ```
 
-**3. The service** (built Branch-02 style: provider + container):
+**Step 3: The service** (built Branch-02 style: provider + container):
 
 ```php
 // app/service/TeacherService.php
@@ -702,7 +702,7 @@ public function register(): void
 }
 ```
 
-**4. GET + POST route pair** — the POST route is named so the form can point at it with `route()`:
+**Step 4: GET + POST route pair** — the POST route is named so the form can point at it with `route()`:
 
 ```php
 // routes/admin.php
@@ -766,7 +766,7 @@ Controllers group related request-handling logic into one class. Two special fla
 
 ### The Code
 
-**1. The invokable controller** — notice the `__invoke` method:
+**Step 1: The invokable controller** — notice the `__invoke` method:
 
 ```php
 // app/Http/Controllers/InvokeController.php
@@ -792,7 +792,7 @@ And its route — **just the class, no `[Class::class, 'method']` array**:
 Route::get('/invoke', InvokeController::class);
 ```
 
-**2. The resource controller** — scaffolded with `php artisan make:controller ResourceController --resource`. Every method maps to one REST action:
+**Step 2: The resource controller** — scaffolded with `php artisan make:controller ResourceController --resource`. Every method maps to one REST action:
 
 ```php
 // app/Http/Controllers/ResourceController.php
@@ -1075,7 +1075,7 @@ Controllers rarely return raw strings — they **render views**. Laravel resolve
 
 ### The Code
 
-**1. The controller** — three ways to pass `$pageTitle`, with the active line using `View::first()`:
+**Step 1: The controller** — three ways to pass `$pageTitle`, with the active line using `View::first()`:
 
 ```php
 // app/Http/Controllers/ViewController.php
@@ -1089,14 +1089,14 @@ public function show_info() {
 
 `View::first()` checks the array left to right: `student.student-details` exists, so that is the view rendered. Delete it, and the fallback `welcome` wins instead.
 
-**2. The route:**
+**Step 2: The route:**
 
 ```php
 // routes/web.php
 Route::get('/view-blade', [ViewController::class, 'show_info'])->name('view-blade');
 ```
 
-**3. Sharing `$settings` with every view** — in the provider's `boot()` (registered in `bootstrap/providers.php`):
+**Step 3: Sharing `$settings` with every view** — in the provider's `boot()` (registered in `bootstrap/providers.php`):
 
 ```php
 // app/Providers/viewProvider.php
@@ -1120,7 +1120,7 @@ public function boot(): void
 
 After this, `{{ $settings->phone }}` works in **any** Blade file — both views in this branch print it.
 
-**4. The views:**
+**Step 4: The views:**
 
 ```blade
 {{-- resources/views/student/student-details.blade.php --}}
@@ -1136,7 +1136,7 @@ student details
 <p>Phone (shared by View::share): {{ $settings->phone }}</p>
 ```
 
-**5. The backing data** — a new `Settings` model with a `phone` column, plus a `SettingsSeeder` (called from `DatabaseSeeder`) so the table has a row:
+**Step 5: The backing data** — a new `Settings` model with a `phone` column, plus a `SettingsSeeder` (called from `DatabaseSeeder`) so the table has a row:
 
 ```bash
 php artisan migrate --seed
@@ -1275,7 +1275,7 @@ In Blade, the `@error('field')` directive scopes the messages of a single field 
 
 ### The Code
 
-**1. Validate in the controller** — list the rules per field; if validation fails, the automatic redirect-back happens before `dd()` is ever reached:
+**Step 1: Validate in the controller** — list the rules per field; if validation fails, the automatic redirect-back happens before `dd()` is ever reached:
 
 ```php
 // app/Http/Controllers/userInfo.php
@@ -1290,14 +1290,14 @@ public function handleUserReq(Request $request)
 }
 ```
 
-**2. The route** — the form posts to the named route `handle-user`:
+**Step 2: The route** — the form posts to the named route `handle-user`:
 
 ```php
 // routes/web.php
 Route::post('/user-registration', [userInfo::class, 'handleUserReq'])->name('handle-user');
 ```
 
-**3. The Blade form** — `@csrf` from Branch 06, an `@error` block under each field, and an `$errors` summary on top:
+**Step 3: The Blade form** — `@csrf` from Branch 06, an `@error` block under each field, and an `$errors` summary on top:
 
 ```blade
 {{-- resources/views/welcome.blade.php --}}
@@ -1384,7 +1384,7 @@ The magic is in how it gets used: **type-hint the Form Request in your controlle
 
 ### The Code
 
-**1. The Form Request class** — rules from Branch 11 moved into `rules()`:
+**Step 1: The Form Request class** — rules from Branch 11 moved into `rules()`:
 
 ```php
 // app/Http/Requests/UserReqValidate.php
@@ -1418,7 +1418,7 @@ class UserReqValidate extends FormRequest
 }
 ```
 
-**2. The controller** — the type-hint changes from `Request` to `UserReqValidate`, and the inline rules are gone:
+**Step 2: The controller** — the type-hint changes from `Request` to `UserReqValidate`, and the inline rules are gone:
 
 ```php
 // app/Http/Controllers/userInfo.php
@@ -1435,7 +1435,7 @@ class userInfo extends Controller
 }
 ```
 
-**3. Route and form** — unchanged from Branch 11. The form still posts to `handle-user`, and `@error` still reads from the shared `$errors` bag:
+**Step 3: Route and form** — unchanged from Branch 11. The form still posts to `handle-user`, and `@error` still reads from the shared `$errors` bag:
 
 ```php
 // routes/web.php
@@ -1514,7 +1514,7 @@ Attach the rule by passing an **instance** alongside the built-in rules — mix 
 
 ### The Code
 
-**1. The rule object** — `strtoupper($value) !== $value` means the value contains at least one lowercase letter, so the rule fails:
+**Step 1: The rule object** — `strtoupper($value) !== $value` means the value contains at least one lowercase letter, so the rule fails:
 
 ```php
 // app/Rules/Uppercase.php
@@ -1540,7 +1540,7 @@ class Uppercase implements ValidationRule
 }
 ```
 
-**2. Using it in the Form Request** — import the class and add `new Uppercase` to the `username` rules from Branch 12:
+**Step 2: Using it in the Form Request** — import the class and add `new Uppercase` to the `username` rules from Branch 12:
 
 ```php
 // app/Http/Requests/UserReqValidate.php
@@ -1555,7 +1555,7 @@ public function rules(): array
 }
 ```
 
-**3. Route and form** — unchanged from Branches 11/12. The rule's failure message lands in the same `$errors` bag, so `@error('username')` displays it with no form changes.
+**Step 3: Route and form** — unchanged from Branches 11/12. The rule's failure message lands in the same `$errors` bag, so `@error('username')` displays it with no form changes.
 
 ### How It Works
 
@@ -1688,13 +1688,13 @@ $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
 ### The Code
 
-**1. Generate the migration** — the name tells Laravel both the table name and that this is a create operation:
+**Step 1: Generate the migration** — the name tells Laravel both the table name and that this is a create operation:
 
 ```bash
 php artisan make:migration create_shops_table
 ```
 
-**2. The migration** — an anonymous class with the two methods every migration has:
+**Step 2: The migration** — an anonymous class with the two methods every migration has:
 
 ```php
 // database/migrations/2026_09_16_161759_create_shops_table.php
@@ -1733,7 +1733,7 @@ return new class extends Migration
 
 `down()` uses `dropIfExists` (no error if the table is missing) instead of `Schema::drop('shops')` (throws if missing) — the safer reverse.
 
-**3. Run it:**
+**Step 3: Run it:**
 
 ```bash
 php artisan migrate
@@ -1840,14 +1840,14 @@ Running commands (from the docs):
 
 ### The Code
 
-**1. Generate the pieces** — the seeder by hand, or a model + factory in one command:
+**Step 1: Generate the pieces** — the seeder by hand, or a model + factory in one command:
 
 ```bash
 php artisan make:seeder ShopsSeeder
 php artisan make:model Shop -f          # model + factory in one go
 ```
 
-**2. The factory** — `definition()` returns the default state for one `Shop`:
+**Step 2: The factory** — `definition()` returns the default state for one `Shop`:
 
 ```php
 // database/factories/ShopFactory.php
@@ -1879,7 +1879,7 @@ class ShopFactory extends Factory
 }
 ```
 
-**3. The seeder** — the raw insert and loop stay in as comments to show the progression; the live line is the factory:
+**Step 3: The seeder** — the raw insert and loop stay in as comments to show the progression; the live line is the factory:
 
 ```php
 // database/seeders/ShopsSeeder.php
@@ -1904,7 +1904,7 @@ class ShopsSeeder extends Seeder
 }
 ```
 
-**4. Wire it into the entry seeder** — `call()` accepts one class or an array (order = execution order):
+**Step 4: Wire it into the entry seeder** — `call()` accepts one class or an array (order = execution order):
 
 ```php
 // database/seeders/DatabaseSeeder.php
@@ -1919,7 +1919,7 @@ public function run(): void
 }
 ```
 
-**5. Run it:**
+**Step 5: Run it:**
 
 ```bash
 php artisan migrate:fresh --seed
@@ -1953,11 +1953,33 @@ flowchart TD
 
 ## Running Any Branch Locally
 
+**Step 1:** Switch to the lesson's branch:
+
 ```bash
 git checkout <branch-name>
+```
+
+**Step 2:** Install the PHP dependencies:
+
+```bash
 composer install
-cp .env.example .env          # if not present
+```
+
+**Step 3:** Create your environment file (if not present):
+
+```bash
+cp .env.example .env
+```
+
+**Step 4:** Generate the application key:
+
+```bash
 php artisan key:generate
+```
+
+**Step 5:** Start the dev server:
+
+```bash
 php artisan serve
 ```
 
