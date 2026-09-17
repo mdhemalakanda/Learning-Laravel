@@ -1637,6 +1637,31 @@ Column methods & modifiers used in this lesson:
 
 > **ℹ️ Note:** Comments are driver-limited — on SQLite (this branch's database) both table and column comments are **silently ignored**, yet the table still creates fine. The `Schema` facade smooths over database differences; only driver-specific modifiers (`->after()`, `->engine()`, ...) are database-limited.
 
+#### Documenting the Schema with Comments
+
+Migrations can carry your data-dictionary right in the schema. There is **no** `php artisan comment` command — comments are just the `comment` modifier chained in the migration file, at two levels:
+
+| Level | Syntax | Where it lands |
+| ----- | ------ | -------------- |
+| Whole table | `$table->comment('Shop Table')` | The table's own comment — call it once, anywhere inside `Schema::create` |
+| Single column | `->comment('Shop Name')` | That column's comment — chain it like any other modifier (`->nullable()->comment(...)`) |
+
+The lesson comments **every** column, so the schema explains itself in any DB tool (the convention this repo follows):
+
+```php
+$table->id()->comment('Primary Key');
+$table->integer('shop_number')->nullable()->comment('Shop Number');
+```
+
+On MySQL / MariaDB / PostgreSQL the comments are stored in the database and survive exports — inspect them with:
+
+```sql
+SHOW FULL COLUMNS FROM shops;   -- per-column comments live in the "Comment" column
+SHOW CREATE TABLE shops;        -- table + column comments in the DDL
+```
+
+On SQLite they are silently dropped (as seen in the `CREATE TABLE` output below), and `timestamps()` can't take a comment because it creates *two* columns (`created_at`, `updated_at`) in one call.
+
 The docs cover far more than this lesson uses — here's the 30-second tour:
 
 ```php
@@ -1680,12 +1705,12 @@ return new class extends Migration
     {
         Schema::create('shops', function (Blueprint $table) {
             $table->comment('Shop Table');                  // table comment (MySQL/MariaDB/PostgreSQL)
-            $table->id();                                   // auto-increment primary key
+            $table->id()->comment('Primary Key');           // auto-increment primary key
             $table->string('shop_name')->nullable()->comment('Shop Name'); // VARCHAR(255), NULL allowed
-            $table->integer('shop_number')->nullable();     // INTEGER, NULL allowed
-            $table->string('shop_address')->nullable();
-            $table->string('shop_phone')->nullable();
-            $table->string('shop_email')->nullable();
+            $table->integer('shop_number')->nullable()->comment('Shop Number'); // INTEGER, NULL allowed
+            $table->string('shop_address')->nullable()->comment('Shop Address');
+            $table->string('shop_phone')->nullable()->comment('Shop Phone');
+            $table->string('shop_email')->nullable()->comment('Shop Email');
             $table->timestamps();                           // created_at + updated_at
         });
     }
@@ -1739,7 +1764,8 @@ flowchart TD
 | `php artisan make:migration create_flights_table` | New file with `Schema::create('flights', ...)` pre-filled |
 | `php artisan migrate` | `2026_09_16_161759_create_shops_table ... DONE` |
 | `php artisan migrate:status` | `Yes  2026_09_16_161759_create_shops_table` — marked as ran |
-| `sqlite3 database/database.sqlite ".schema shops"` | The raw `CREATE TABLE "shops" (...)` SQL |
+| `sqlite3 database/database.sqlite ".schema shops"` | The raw `CREATE TABLE "shops" (...)` SQL — no comments, SQLite drops them |
+| MySQL: `SHOW FULL COLUMNS FROM shops;` | Every column's `->comment()` text in the **Comment** column |
 | `php artisan migrate:rollback` | `down()` runs — the `shops` table is dropped |
 | `php artisan migrate:refresh` | Rollback + migrate — table rebuilt in one step |
 
