@@ -19,6 +19,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 | *(folded into* [`13-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/13-Custom-Validation)*)* | Custom Validation (Form Requests) | Form Request class, `authorize()`, `rules()`, automatic validation via controller type-hint |
 | [`13-Custom-Validation`](https://github.com/mdhemalakanda/Learning-Laravel/tree/13-Custom-Validation) | Custom Validation Rules | Rule objects, `make:rule`, `ValidationRule::validate()`, `$fail()` callback |
 | [`14-Migration`](https://github.com/mdhemalakanda/Learning-Laravel/tree/14-Migration) | Migrations | `make:migration`, `Schema` facade, `Blueprint` columns & modifiers, `migrate` / `rollback` / `refresh` / `fresh` |
+| [`15-Seed`](https://github.com/mdhemalakanda/Learning-Laravel/tree/15-Seed) | Seed | `make:seeder`, `run()`, `DB::table()->insert()`, model factories, Faker, `$this->call()`, `db:seed` |
 
 ---
 
@@ -39,6 +40,7 @@ This repository is a **hands-on Laravel learning journey**. Each branch is one l
 - [Branch 12 — Custom Validation (Form Requests)](#branch-12--custom-validation-form-requests)
 - [Branch 13 — Custom Validation Rules (Rule Objects)](#branch-13--custom-validation-rules-rule-objects)
 - [Branch 14 — Migrations](#branch-14--migrations)
+- [Branch 15 — Seed](#branch-15--seed)
 
 ---
 
@@ -1778,6 +1780,177 @@ flowchart TD
 
 ---
 
+## Branch 15 — Seed
+
+> **Topic:** Filling tables with **test data** — seeder classes (`make:seeder`), the `run()` method, raw `DB::table()->insert()` vs **model factories** with Faker, and chaining seeders from `DatabaseSeeder` with `$this->call()`.
+> **New files:** `app/Models/Shop.php`, `database/factories/ShopFactory.php`, `database/seeders/ShopsSeeder.php`
+> **Modified:** `database/seeders/DatabaseSeeder.php`
+> **Official docs:** [Seeding](https://laravel.com/docs/seeding) · [Eloquent Factories](https://laravel.com/docs/eloquent-factories)
+
+### Files in This Lesson
+
+| File | Role |
+| ---- | ---- |
+| `app/Models/Shop.php` | Eloquent model — `HasFactory` enables `Shop::factory()` |
+| `database/factories/ShopFactory.php` | The fake-row blueprint — `definition()` maps Faker helpers to the shop columns |
+| `database/seeders/ShopsSeeder.php` | The lesson's seeder — raw insert (commented), loop insert (commented), then `Shop::factory(10)->create()` |
+| `database/seeders/DatabaseSeeder.php` | The entry point `db:seed` runs — now calls `ShopsSeeder` |
+
+### The Concept
+
+**Seeders are classes whose job is to insert data into your database.** All seeders live in `database/seeders`. A fresh app ships with a single `DatabaseSeeder` — `db:seed` runs exactly that class, and it can `call()` other seeders in whatever order you define.
+
+| Piece | Purpose |
+| ----- | ------- |
+| `php artisan make:seeder ShopsSeeder` | Generates an empty seeder in `database/seeders` with one method: `run()` |
+| `run()` | Called when the seeder executes — insert data any way you like (query builder or factories) |
+| `$this->call(ShopsSeeder::class)` | Runs another seeder; accepts an array to chain several, in order |
+| `WithoutModelEvents` trait | Mutes model events while seeding so no listeners fire |
+| Mass assignment | Automatically disabled during seeding — factories can fill any column |
+
+The lesson shows **three ways to insert**, in order of evolution:
+
+| Approach | Code | Verdict |
+| -------- | ---- | ------- |
+| Raw insert | `DB::table('shops')->insert([...])` | One row, hand-typed values — fine for a fixed record, tedious for test data |
+| Loop + insert | `for ($i = 0; $i <= 50000; $i++) DB::table('shops')->insert(...)` | Volume, but repeated values and **one query per row** — 50,001 round-trips |
+| Model factory | `Shop::factory(10)->create()` | Realistic Faker data, `created_at`/`updated_at` filled, Eloquent models returned |
+
+The **factory** is where the fake data comes from — `definition()` returns the default attributes for one model, using Faker helpers that mirror the migration's columns (Branch 14):
+
+```php
+'shop_name'    => fake()->company(),
+'shop_number'  => fake()->numberBetween(1, 500),
+'shop_address' => fake()->address(),
+'shop_phone'   => fake()->phoneNumber(),
+'shop_email'   => fake()->safeEmail(),
+```
+
+Running commands (from the docs):
+
+| Command | What it does |
+| ------- | ------------ |
+| `php artisan db:seed` | Runs `DatabaseSeeder` (and everything it calls) |
+| `php artisan db:seed --class=ShopsSeeder` | Runs **one** seeder directly |
+| `php artisan migrate:fresh --seed` | Drop all tables → re-migrate → seed — a complete rebuild |
+| `php artisan migrate:fresh --seed --seeder=ShopsSeeder` | Rebuild, but seed with only `ShopsSeeder` |
+| `php artisan db:seed --force` | Skip the production confirmation prompt |
+
+> **⚠️ Heads-up:** `db:seed` **appends** — run it twice and the shops table holds 20 rows. For a repeatable dataset, use `migrate:fresh --seed`. And in production, seeding prompts for confirmation because it alters data; `--force` skips that prompt.
+
+### The Code
+
+**1. Generate the pieces** — the seeder by hand, or a model + factory in one command:
+
+```bash
+php artisan make:seeder ShopsSeeder
+php artisan make:model Shop -f          # model + factory in one go
+```
+
+**2. The factory** — `definition()` returns the default state for one `Shop`:
+
+```php
+// database/factories/ShopFactory.php
+namespace Database\Factories;
+
+use App\Models\Shop;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * @extends Factory<Shop>
+ */
+class ShopFactory extends Factory
+{
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'shop_name' => fake()->company(),
+            'shop_number' => fake()->numberBetween(1, 500),
+            'shop_address' => fake()->address(),
+            'shop_phone' => fake()->phoneNumber(),
+            'shop_email' => fake()->safeEmail(),
+        ];
+    }
+}
+```
+
+**3. The seeder** — the raw insert and loop stay in as comments to show the progression; the live line is the factory:
+
+```php
+// database/seeders/ShopsSeeder.php
+namespace Database\Seeders;
+
+use App\Models\Shop;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+
+class ShopsSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        // DB::table('shops')->insert([...]);            // 1. one hand-typed row
+        // for ($i = 0; $i <= 50000; $i++) { ... }       // 2. loop of single inserts
+
+        Shop::factory(10)->create();                      // 3. ten Faker rows, one call
+    }
+}
+```
+
+**4. Wire it into the entry seeder** — `call()` accepts one class or an array (order = execution order):
+
+```php
+// database/seeders/DatabaseSeeder.php
+public function run(): void
+{
+    User::factory()->create([
+        'name' => 'Test User',
+        'email' => 'test@example.com',
+    ]);
+
+    $this->call(ShopsSeeder::class);
+}
+```
+
+**5. Run it:**
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["php artisan migrate:fresh --seed"] --> B["Drop all tables<br/>re-run every migration"]
+    B --> C["DatabaseSeeder::run()"]
+    C --> D["User::factory()->create()<br/>1 test user"]
+    C --> E["$this->call(ShopsSeeder::class)"]
+    E --> F["Shop::factory(10)->create()"]
+    F --> G["Factory resolves ShopFactory<br/>definition() → 10 sets of Faker values"]
+    G --> H["10 INSERTs into shops<br/>timestamps filled, models returned"]
+    H --> I["phpMyAdmin → laravel.shops<br/>10 fake shops visible"]
+```
+
+### Try It
+
+| Command | Result |
+| ------- | ------ |
+| `php artisan migrate:fresh --seed` | Clean rebuild — exactly 10 fake shops + 1 test user |
+| `SELECT COUNT(*) FROM shops;` | `10` (re-run `db:seed` first and it grows — seeding appends) |
+| `php artisan db:seed --class=ShopsSeeder` | Only the shops seeder runs — 10 more shops, users untouched |
+| `php artisan migrate:fresh --seed --seeder=ShopsSeeder` | Rebuild, but no test user — only the 10 shops |
+| Refresh phpMyAdmin | Faker data: real-looking company names, addresses, phones |
+
+---
+
 ## Running Any Branch Locally
 
 ```bash
@@ -1813,3 +1986,5 @@ php artisan route:list
 - [Laravel Documentation — Form Request Validation](https://laravel.com/docs/validation#form-request-validation)
 - [Laravel Documentation — Custom Validation Rules](https://laravel.com/docs/validation#custom-validation-rules)
 - [Laravel Documentation — Migrations](https://laravel.com/docs/migrations)
+- [Laravel Documentation — Seeding](https://laravel.com/docs/seeding)
+- [Laravel Documentation — Eloquent Factories](https://laravel.com/docs/eloquent-factories)
