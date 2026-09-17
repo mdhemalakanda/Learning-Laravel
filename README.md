@@ -1583,8 +1583,8 @@ flowchart TD
 ## Branch 14 — Migrations
 
 > **Topic:** Database **migrations** — version control for your database schema. Generating a migration with `make:migration`, building a table with the `Schema` facade + `Blueprint`, column types & modifiers, and running / rolling back migrations.
-> **New files:** `database/migrations/2026_09_16_161759_create_shops_table.php`
-> **Modified:** — (this branch is a fresh Laravel app; the lesson adds exactly one migration)
+> **New files:** `database/migrations/2026_09_16_161759_create_shops_table.php`, `app/Models/Shop.php`, `database/factories/ShopFactory.php`, `database/seeders/ShopsSeeder.php`
+> **Modified:** `database/seeders/DatabaseSeeder.php` — now also calls `ShopsSeeder`
 > **Official docs:** [Migrations](https://laravel.com/docs/migrations)
 
 ### Files in This Lesson
@@ -1592,6 +1592,10 @@ flowchart TD
 | File | Role |
 | ---- | ---- |
 | `database/migrations/2026_09_16_161759_create_shops_table.php` | The migration — `up()` creates the `shops` table, `down()` drops it |
+| `app/Models/Shop.php` | Eloquent model — `HasFactory` so `Shop::factory()` works |
+| `database/factories/ShopFactory.php` | Fake row blueprint — Faker's `company()`, `numberBetween()`, `address()`, `phoneNumber()`, `safeEmail()` map to the shop columns |
+| `database/seeders/ShopsSeeder.php` | `Shop::factory(10)->create()` — inserts 10 fake shops |
+| `database/seeders/DatabaseSeeder.php` | The entry seeder `migrate --seed` runs — now calls `ShopsSeeder` too |
 | `database/migrations/0001_01_01_000000_create_users_table.php` (+ cache & jobs) | Laravel's default migrations — shipped with every new app, so users / cache / jobs tables exist out of the box |
 | `database/database.sqlite` | The SQLite database the migration runs against |
 
@@ -1768,6 +1772,9 @@ flowchart TD
 | MySQL: `SHOW FULL COLUMNS FROM shops;` | Every column's `->comment()` text in the **Comment** column |
 | `php artisan migrate:rollback` | `down()` runs — the `shops` table is dropped |
 | `php artisan migrate:refresh` | Rollback + migrate — table rebuilt in one step |
+| `php artisan migrate:fresh --seed` | Drop all tables → re-migrate → seed — 10 fake shops appear in phpMyAdmin |
+
+> **ℹ️ Note:** Migrations build **structure**, seeders insert **data** — `migrate:fresh --seed` created the `shops` table but it stayed empty until `DatabaseSeeder` called `ShopsSeeder`. A seeder is only executed when you ask for it: `php artisan db:seed` runs all seeders, `php artisan db:seed --class=ShopsSeeder` runs one, and `--seed` appends seeding to any migrate command.
 
 ---
 
